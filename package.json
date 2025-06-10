@@ -1,0 +1,15 @@
+{
+  "name": "vibe-checker",
+  "private": true,
+  "workspaces": [
+    "products/**"
+  ],
+  "scripts": {
+    "dev": "concurrently -k \"npm run dev -w products/backend\" \"npm run dev -w products/frontend\"",
+    "build": "npm run build -w products/backend && npm run build -w products/frontend",
+    "start": "npm run start -w products/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}

@@ -1,0 +1,20 @@
+# Common files to ignore
+*.log
+*.tmp
+*.cache
+*~
+
+# Dependency directories
+node_modules/
+venv/
+
+# IDE files
+.idea/
+.vscode/
+
+# Temporary files
+**/temp/
+
+.env
+
+.gpt/
