@@ -3,9 +3,9 @@ import http from 'http';
 import { Server as SocketServer } from 'socket.io';
 import tmi from 'tmi.js';
 import Redis from 'redis';
-import { parse } from 'url';
 import axios from 'axios';
-import { json2csvAsync } from 'json-2-csv';
+import { json2csv } from 'json-2-csv';
+import cors from 'cors';
 
 import { CONFIG } from './config.js';
 import { scoreBatch, WINDOW_MS } from './sentimentEngine.js';
@@ -22,6 +22,9 @@ const buffers = new Map();
 const MSG_HISTORY_WINDOW = 30 * 60 * 1000; // 30 minutes
 const MSG_BUCKETS = new Map(); // channel -> Map<bucketTs, string[]>
 let sentimentInterval = null;
+
+app.use(express.json()); // for parsing JSON bodies
+app.use(cors());
 
 // --- OAuth Endpoints ---
 app.get('/api/auth/twitch/login', (req, res) => {
@@ -105,6 +108,13 @@ async function getAccessToken() {
   return token;
 }
 
+// Helper to normalize channel key (URL-encode, remove leading # if present)
+function channelKey(channel) {
+  return encodeURIComponent(
+    channel.startsWith('#') ? channel.slice(1) : channel
+  );
+}
+
 // --- Connect Twitch client only after OAuth ---
 async function connectTwitchClient() {
   if (twitchClient) return twitchClient; // Already connected
@@ -132,28 +142,33 @@ async function connectTwitchClient() {
 
 function setupTwitchHandlers() {
   if (!twitchClient) return;
+
   twitchClient.on('message', (channel, tags, message, self) => {
     if (self) return;
-    const bucket = buffers.get(channel) || [];
+    const key = channelKey(channel);
+    console.log('key', key, message);
+    const bucket = buffers.get(key) || [];
     bucket.push(message);
-    buffers.set(channel, bucket);
+    buffers.set(key, bucket);
   });
+
   if (!sentimentInterval) {
     sentimentInterval = setInterval(async () => {
       const now = Date.now();
-      for (const [channel, msgs] of buffers) {
+      for (const [key, msgs] of buffers) {
         const score = scoreBatch(msgs);
-        buffers.set(channel, []);
+        buffers.set(key, []);
 
-        const key = `sentiment:${channel}`;
-        await redis.zAdd(key, { score: now, value: score.toString() });
-        await redis.expire(key, 60 * 60);
+        const redisKey = `sentiment:${key}`;
+        await redis.zAdd(redisKey, { score: now, value: score.toString() });
+        await redis.expire(redisKey, 60 * 60);
 
         // Store messages for this bucket
-        let buckets = MSG_BUCKETS.get(channel);
+        let buckets = MSG_BUCKETS.get(key);
+        console.log('buckets', buckets, key);
         if (!buckets) {
           buckets = new Map();
-          MSG_BUCKETS.set(channel, buckets);
+          MSG_BUCKETS.set(key, buckets);
         }
         buckets.set(now, msgs.slice(0, 20)); // store up to 20 messages per bucket
         // Clean up old buckets
@@ -161,7 +176,8 @@ function setupTwitchHandlers() {
           if (now - ts > MSG_HISTORY_WINDOW) buckets.delete(ts);
         }
 
-        io.to(channel).emit('sentiment:update', { channel, score, ts: now });
+        io.to(key).emit('sentiment:update', { channel: key, score, ts: now });
+        checkAlerts(key, score, now);
       }
     }, WINDOW_MS);
   }
@@ -169,33 +185,37 @@ function setupTwitchHandlers() {
 
 // --- Calibration privacy: only send to panel ---
 io.on('connection', (socket) => {
-  const { channel, panel } = socket.handshake.query;
+  let { channel, panel } = socket.handshake.query;
+  const key = channelKey(channel);
   if (channel) {
     if (panel === 'true') {
-      socket.join(`panel:${channel}`);
+      socket.join(`panel:${key}`);
     } else {
-      socket.join(channel);
+      socket.join(key);
     }
   }
 
   socket.on('calibrate', async ({ channel, vote }) => {
+    const key = channelKey(channel);
     const val = vote === 'happy' ? 1 : vote === 'sad' ? -1 : 0;
-    const key = `calibration:${channel}`;
-    await redis.incrByFloat(key, val);
-    await redis.expire(key, 60 * 60);
+    const calKey = `calibration:${key}`;
+    await redis.incrByFloat(calKey, val);
+    await redis.expire(calKey, 60 * 60);
     // Only emit calibration events to the panel
-    io.to(`panel:${channel}`).emit('calibration:update', { channel, vote });
+    io.to(`panel:${key}`).emit('calibration:update', { channel: key, vote });
   });
 });
 
 // API: Get last 30 minutes of sentiment scores (bucketed)
 app.get('/api/sentiment/:channel/history', async (req, res) => {
-  const { channel } = req.params;
+  const key = channelKey(req.params.channel);
   const now = Date.now();
+  console.log('key', key);
   const since = now - MSG_HISTORY_WINDOW;
-  const key = `sentiment:${channel}`;
+  const redisKey = `sentiment:${key}`;
   // Get all scores in the last 30 minutes
-  const results = await redis.zRangeByScoreWithScores(key, since, now);
+  const results = await redis.zRangeByScoreWithScores(redisKey, since, now);
+  console.log('results', results);
   // Format: [{ ts, score }]
   const data = results.map(({ value, score }) => ({
     ts: score,
@@ -206,9 +226,9 @@ app.get('/api/sentiment/:channel/history', async (req, res) => {
 
 // API: Get sample messages for a given bucket
 app.get('/api/sentiment/:channel/messages', (req, res) => {
-  const { channel } = req.params;
+  const key = channelKey(req.params.channel);
   const ts = parseInt(req.query.ts, 10);
-  const buckets = MSG_BUCKETS.get(channel);
+  const buckets = MSG_BUCKETS.get(key);
   if (!buckets || !buckets.has(ts)) return res.json([]);
   // Return up to 5 sample messages
   const msgs = buckets.get(ts) || [];
@@ -217,16 +237,20 @@ app.get('/api/sentiment/:channel/messages', (req, res) => {
 
 // Session report endpoints (last 4 hours as session)
 app.get('/api/session/:channel/report.json', async (req, res) => {
-  const { channel } = req.params;
+  const key = channelKey(req.params.channel);
   const now = Date.now();
   const since = now - 4 * 60 * 60 * 1000; // 4 hours
-  const key = `sentiment:${channel}`;
-  const results = await redis.zRangeByScoreWithScores(key, since, now);
+  const redisKey = `sentiment:${key}`;
+  const results = await redis.zRangeByScoreWithScores(redisKey, since, now);
   const data = results.map(({ value, score }) => ({
     ts: score,
     score: parseFloat(value),
   }));
-  if (!data.length) return res.json({ error: 'No data' });
+  if (!data.length) {
+    res.header('Content-Type', 'application/json');
+    res.attachment(`session-${key}.json`);
+    return res.send(JSON.stringify({ error: 'No data' }, null, 2));
+  }
   const scores = data.map((d) => d.score);
   const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
   const min = Math.min(...scores);
@@ -242,10 +266,10 @@ app.get('/api/session/:channel/report.json', async (req, res) => {
     }
   }
   // Calibration feedback
-  const calKey = `calibration:${channel}`;
+  const calKey = `calibration:${key}`;
   const calibration = await redis.get(calKey);
-  res.json({
-    channel,
+  const report = {
+    channel: key,
     from: since,
     to: now,
     avg,
@@ -254,20 +278,27 @@ app.get('/api/session/:channel/report.json', async (req, res) => {
     spikes,
     calibration: calibration ? parseFloat(calibration) : 0,
     data,
-  });
+  };
+  res.header('Content-Type', 'application/json');
+  res.attachment(`session-${key}.json`);
+  res.send(JSON.stringify(report, null, 2));
 });
 
 app.get('/api/session/:channel/report.csv', async (req, res) => {
-  const { channel } = req.params;
+  const key = channelKey(req.params.channel);
   const now = Date.now();
   const since = now - 4 * 60 * 60 * 1000; // 4 hours
-  const key = `sentiment:${channel}`;
-  const results = await redis.zRangeByScoreWithScores(key, since, now);
+  const redisKey = `sentiment:${key}`;
+  const results = await redis.zRangeByScoreWithScores(redisKey, since, now);
   const data = results.map(({ value, score }) => ({
     ts: score,
     score: parseFloat(value),
   }));
-  if (!data.length) return res.status(404).send('No data');
+  if (!data.length) {
+    res.header('Content-Type', 'text/csv');
+    res.attachment(`session-${key}.csv`);
+    return res.send('No data');
+  }
   const scores = data.map((d) => d.score);
   const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
   const min = Math.min(...scores);
@@ -281,11 +312,11 @@ app.get('/api/session/:channel/report.csv', async (req, res) => {
       spikes.push({ ts: data[i].ts, score: data[i].score });
     }
   }
-  const calKey = `calibration:${channel}`;
+  const calKey = `calibration:${key}`;
   const calibration = await redis.get(calKey);
   const summary = [
     {
-      channel,
+      channel: key,
       from: since,
       to: now,
       avg,
@@ -294,12 +325,63 @@ app.get('/api/session/:channel/report.csv', async (req, res) => {
       calibration: calibration ? parseFloat(calibration) : 0,
     },
   ];
-  const summaryCsv = await json2csvAsync(summary);
-  const dataCsv = await json2csvAsync(data);
+  const summaryCsv = json2csv(summary);
+  const dataCsv = json2csv(data);
   res.header('Content-Type', 'text/csv');
-  res.attachment(`session-${channel}.csv`);
+  res.attachment(`session-${key}.csv`);
   res.send(summaryCsv + '\n\n' + dataCsv);
 });
+
+// --- Custom Alerts ---
+// Set alert threshold and duration
+app.post('/api/alerts/:channel', async (req, res) => {
+  const { channel } = req.params;
+  const { threshold, duration } = req.body;
+  if (typeof threshold !== 'number' || typeof duration !== 'number') {
+    return res
+      .status(400)
+      .json({ error: 'threshold and duration must be numbers' });
+  }
+  await redis.set(`alerts:${channel}`, JSON.stringify({ threshold, duration }));
+  res.json({ ok: true });
+});
+
+// Get alert settings
+app.get('/api/alerts/:channel', async (req, res) => {
+  const { channel } = req.params;
+  const data = await redis.get(`alerts:${channel}`);
+  if (!data) return res.json({ threshold: -0.5, duration: 30 }); // default
+  res.json(JSON.parse(data));
+});
+
+// --- Alert monitoring ---
+const alertState = new Map(); // channel -> { belowSince, active }
+
+function checkAlerts(channel, score, now) {
+  redis.get(`alerts:${channel}`).then((data) => {
+    const settings = data
+      ? JSON.parse(data)
+      : { threshold: -0.5, duration: 30 };
+    let state = alertState.get(channel) || { belowSince: null, active: false };
+    if (score < settings.threshold) {
+      if (!state.belowSince) state.belowSince = now;
+      if (!state.active && now - state.belowSince >= settings.duration * 1000) {
+        state.active = true;
+        io.to(`panel:${channel}`).emit('alert:triggered', {
+          channel,
+          score,
+          ts: now,
+          threshold: settings.threshold,
+          duration: settings.duration,
+        });
+      }
+    } else {
+      state.belowSince = null;
+      state.active = false;
+    }
+    alertState.set(channel, state);
+  });
+}
 
 server.listen(CONFIG.port, async () => {
   console.log(`[Backend] Listening on :${CONFIG.port}`);
