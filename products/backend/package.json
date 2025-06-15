@@ -1,5 +1,5 @@
 {
-  "name": "vibe-checker-backend",
+  "name": "mood-meter-backend",
   "version": "0.1.0",
   "main": "src/server.js",
   "type": "module",

@@ -6,6 +6,8 @@ import Redis from 'redis';
 import axios from 'axios';
 import { json2csv } from 'json-2-csv';
 import cors from 'cors';
+import jwt from 'jsonwebtoken';
+import jwksClient from 'jwks-rsa';
 
 import { CONFIG } from './config.js';
 import { scoreBatch, WINDOW_MS } from './sentimentEngine.js';
@@ -25,6 +27,61 @@ let sentimentInterval = null;
 
 app.use(express.json()); // for parsing JSON bodies
 app.use(cors());
+
+// Twitch public keys endpoint
+const jwks = jwksClient({
+  jwksUri: 'https://id.twitch.tv/oauth2/keys',
+});
+
+function getKey(header, callback) {
+  jwks.getSigningKey(header.kid, function (err, key) {
+    const signingKey = key.publicKey || key.rsaPublicKey;
+    callback(null, signingKey);
+  });
+}
+
+// Middleware to verify Twitch Extension JWT
+function verifyTwitchJWT(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res
+      .status(401)
+      .json({ error: 'Missing or invalid Authorization header' });
+  }
+  const token = auth.slice(7);
+  jwt.verify(
+    token,
+    getKey,
+    {
+      audience: CONFIG.twitch.clientId,
+      algorithms: ['RS256'],
+    },
+    (err, decoded) => {
+      if (err) {
+        return res
+          .status(401)
+          .json({ error: 'Invalid JWT', details: err.message });
+      }
+      req.twitch = decoded;
+      next();
+    }
+  );
+}
+
+// Helper to check channel match
+function checkChannelMatch(req, res, next) {
+  const requested = channelKey(req.params.channel);
+  const jwtChannel =
+    req.twitch &&
+    req.twitch.channel_id &&
+    encodeURIComponent(req.twitch.channel_id);
+  if (jwtChannel && requested !== jwtChannel) {
+    return res
+      .status(403)
+      .json({ error: 'JWT channel_id does not match requested channel' });
+  }
+  next();
+}
 
 // --- OAuth Endpoints ---
 app.get('/api/auth/twitch/login', (req, res) => {
@@ -81,7 +138,7 @@ app.get('/', async (req, res, next) => {
       (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
     app._router.handle(req, res, next);
   } else {
-    res.send('Welcome to Sentiment Snapshot backend!');
+    res.send('Welcome to Mood Meter backend!');
   }
 });
 
@@ -236,123 +293,146 @@ app.get('/api/sentiment/:channel/messages', (req, res) => {
 });
 
 // Session report endpoints (last 4 hours as session)
-app.get('/api/session/:channel/report.json', async (req, res) => {
-  const key = channelKey(req.params.channel);
-  const now = Date.now();
-  const since = now - 4 * 60 * 60 * 1000; // 4 hours
-  const redisKey = `sentiment:${key}`;
-  const results = await redis.zRangeByScoreWithScores(redisKey, since, now);
-  const data = results.map(({ value, score }) => ({
-    ts: score,
-    score: parseFloat(value),
-  }));
-  if (!data.length) {
-    res.header('Content-Type', 'application/json');
-    res.attachment(`session-${key}.json`);
-    return res.send(JSON.stringify({ error: 'No data' }, null, 2));
-  }
-  const scores = data.map((d) => d.score);
-  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-  const min = Math.min(...scores);
-  const max = Math.max(...scores);
-  // Find spikes (local min/max)
-  const spikes = [];
-  for (let i = 1; i < scores.length - 1; ++i) {
-    if (
-      (scores[i] > scores[i - 1] && scores[i] > scores[i + 1]) ||
-      (scores[i] < scores[i - 1] && scores[i] < scores[i + 1])
-    ) {
-      spikes.push({ ts: data[i].ts, score: data[i].score });
+app.get(
+  '/api/session/:channel/report.json',
+  verifyTwitchJWT,
+  checkChannelMatch,
+  async (req, res) => {
+    const key = channelKey(req.params.channel);
+    const now = Date.now();
+    const since = now - 4 * 60 * 60 * 1000; // 4 hours
+    const redisKey = `sentiment:${key}`;
+    const results = await redis.zRangeByScoreWithScores(redisKey, since, now);
+    const data = results.map(({ value, score }) => ({
+      ts: score,
+      score: parseFloat(value),
+    }));
+    if (!data.length) {
+      res.header('Content-Type', 'application/json');
+      res.attachment(`session-${key}.json`);
+      return res.send(JSON.stringify({ error: 'No data' }, null, 2));
     }
-  }
-  // Calibration feedback
-  const calKey = `calibration:${key}`;
-  const calibration = await redis.get(calKey);
-  const report = {
-    channel: key,
-    from: since,
-    to: now,
-    avg,
-    min,
-    max,
-    spikes,
-    calibration: calibration ? parseFloat(calibration) : 0,
-    data,
-  };
-  res.header('Content-Type', 'application/json');
-  res.attachment(`session-${key}.json`);
-  res.send(JSON.stringify(report, null, 2));
-});
-
-app.get('/api/session/:channel/report.csv', async (req, res) => {
-  const key = channelKey(req.params.channel);
-  const now = Date.now();
-  const since = now - 4 * 60 * 60 * 1000; // 4 hours
-  const redisKey = `sentiment:${key}`;
-  const results = await redis.zRangeByScoreWithScores(redisKey, since, now);
-  const data = results.map(({ value, score }) => ({
-    ts: score,
-    score: parseFloat(value),
-  }));
-  if (!data.length) {
-    res.header('Content-Type', 'text/csv');
-    res.attachment(`session-${key}.csv`);
-    return res.send('No data');
-  }
-  const scores = data.map((d) => d.score);
-  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-  const min = Math.min(...scores);
-  const max = Math.max(...scores);
-  const spikes = [];
-  for (let i = 1; i < scores.length - 1; ++i) {
-    if (
-      (scores[i] > scores[i - 1] && scores[i] > scores[i + 1]) ||
-      (scores[i] < scores[i - 1] && scores[i] < scores[i + 1])
-    ) {
-      spikes.push({ ts: data[i].ts, score: data[i].score });
+    const scores = data.map((d) => d.score);
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const min = Math.min(...scores);
+    const max = Math.max(...scores);
+    // Find spikes (local min/max)
+    const spikes = [];
+    for (let i = 1; i < scores.length - 1; ++i) {
+      if (
+        (scores[i] > scores[i - 1] && scores[i] > scores[i + 1]) ||
+        (scores[i] < scores[i - 1] && scores[i] < scores[i + 1])
+      ) {
+        spikes.push({ ts: data[i].ts, score: data[i].score });
+      }
     }
-  }
-  const calKey = `calibration:${key}`;
-  const calibration = await redis.get(calKey);
-  const summary = [
-    {
+    // Calibration feedback
+    const calKey = `calibration:${key}`;
+    const calibration = await redis.get(calKey);
+    const report = {
       channel: key,
       from: since,
       to: now,
       avg,
       min,
       max,
+      spikes,
       calibration: calibration ? parseFloat(calibration) : 0,
-    },
-  ];
-  const summaryCsv = json2csv(summary);
-  const dataCsv = json2csv(data);
-  res.header('Content-Type', 'text/csv');
-  res.attachment(`session-${key}.csv`);
-  res.send(summaryCsv + '\n\n' + dataCsv);
-});
+      data,
+    };
+    res.header('Content-Type', 'application/json');
+    res.attachment(`session-${key}.json`);
+    res.send(JSON.stringify(report, null, 2));
+  }
+);
+
+app.get(
+  '/api/session/:channel/report.csv',
+  verifyTwitchJWT,
+  checkChannelMatch,
+  async (req, res) => {
+    const key = channelKey(req.params.channel);
+    const now = Date.now();
+    const since = now - 4 * 60 * 60 * 1000; // 4 hours
+    const redisKey = `sentiment:${key}`;
+    const results = await redis.zRangeByScoreWithScores(redisKey, since, now);
+    const data = results.map(({ value, score }) => ({
+      ts: score,
+      score: parseFloat(value),
+    }));
+    if (!data.length) {
+      res.header('Content-Type', 'text/csv');
+      res.attachment(`session-${key}.csv`);
+      return res.send('No data');
+    }
+    const scores = data.map((d) => d.score);
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const min = Math.min(...scores);
+    const max = Math.max(...scores);
+    const spikes = [];
+    for (let i = 1; i < scores.length - 1; ++i) {
+      if (
+        (scores[i] > scores[i - 1] && scores[i] > scores[i + 1]) ||
+        (scores[i] < scores[i - 1] && scores[i] < scores[i + 1])
+      ) {
+        spikes.push({ ts: data[i].ts, score: data[i].score });
+      }
+    }
+    const calKey = `calibration:${key}`;
+    const calibration = await redis.get(calKey);
+    const summary = [
+      {
+        channel: key,
+        from: since,
+        to: now,
+        avg,
+        min,
+        max,
+        calibration: calibration ? parseFloat(calibration) : 0,
+      },
+    ];
+    const summaryCsv = json2csv(summary);
+    const dataCsv = json2csv(data);
+    res.header('Content-Type', 'text/csv');
+    res.attachment(`session-${key}.csv`);
+    res.send(summaryCsv + '\n\n' + dataCsv);
+  }
+);
 
 // --- Custom Alerts ---
 // Set alert threshold and duration
-app.post('/api/alerts/:channel', async (req, res) => {
-  const { channel } = req.params;
-  const { threshold, duration } = req.body;
-  if (typeof threshold !== 'number' || typeof duration !== 'number') {
-    return res
-      .status(400)
-      .json({ error: 'threshold and duration must be numbers' });
+app.post(
+  '/api/alerts/:channel',
+  verifyTwitchJWT,
+  checkChannelMatch,
+  async (req, res) => {
+    const { channel } = req.params;
+    const { threshold, duration } = req.body;
+    if (typeof threshold !== 'number' || typeof duration !== 'number') {
+      return res
+        .status(400)
+        .json({ error: 'threshold and duration must be numbers' });
+    }
+    await redis.set(
+      `alerts:${channelKey(channel)}`,
+      JSON.stringify({ threshold, duration })
+    );
+    res.json({ ok: true });
   }
-  await redis.set(`alerts:${channel}`, JSON.stringify({ threshold, duration }));
-  res.json({ ok: true });
-});
+);
 
 // Get alert settings
-app.get('/api/alerts/:channel', async (req, res) => {
-  const { channel } = req.params;
-  const data = await redis.get(`alerts:${channel}`);
-  if (!data) return res.json({ threshold: -0.5, duration: 30 }); // default
-  res.json(JSON.parse(data));
-});
+app.get(
+  '/api/alerts/:channel',
+  verifyTwitchJWT,
+  checkChannelMatch,
+  async (req, res) => {
+    const { channel } = req.params;
+    const data = await redis.get(`alerts:${channelKey(channel)}`);
+    if (!data) return res.json({ threshold: -0.5, duration: 30 }); // default
+    res.json(JSON.parse(data));
+  }
+);
 
 // --- Alert monitoring ---
 const alertState = new Map(); // channel -> { belowSince, active }

@@ -4,8 +4,7 @@ import Trendline from './Trendline.jsx';
 import { connectSocket } from '../common/socket';
 
 const urlChannel = new URLSearchParams(window.location.search).get('channel');
-// const backend = import.meta.env.VITE_BACKEND_URL;
-const backend = 'http://localhost:4000';
+const backend = import.meta.env.VITE_BACKEND_URL;
 
 function Panel({ channel }) {
   const [threshold, setThreshold] = useState(-0.5);
@@ -13,17 +12,31 @@ function Panel({ channel }) {
   const [saving, setSaving] = useState(false);
   const [alert, setAlert] = useState(null);
   const [showBanner, setShowBanner] = useState(false);
+  const [jwt, setJwt] = useState(null);
+  const [channelId, setChannelId] = useState(channel);
+
+  // Listen for Twitch JWT auth
+  useEffect(() => {
+    if (window.Twitch && window.Twitch.ext) {
+      window.Twitch.ext.onAuthorized((auth) => {
+        setJwt(auth.token);
+        setChannelId(auth.channelId);
+      });
+    }
+  }, []);
 
   // Fetch current alert settings
   useEffect(() => {
     if (!channel) return;
-    fetch(`${backend}/api/alerts/${channel}`)
+    fetch(`${backend}/api/alerts/${channel}`, {
+      headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+    })
       .then((r) => r.json())
       .then(({ threshold, duration }) => {
         if (typeof threshold === 'number') setThreshold(threshold);
         if (typeof duration === 'number') setDuration(duration);
       });
-  }, [channel]);
+  }, [channel, jwt]);
 
   // Listen for alert events
   useEffect(() => {
@@ -42,7 +55,10 @@ function Panel({ channel }) {
     setSaving(true);
     await fetch(`${backend}/api/alerts/${channel}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
+      },
       body: JSON.stringify({ threshold, duration }),
     });
     setSaving(false);
@@ -51,7 +67,9 @@ function Panel({ channel }) {
   // Download JSON report using fetch + Blob
   const downloadJson = async (e) => {
     e.preventDefault();
-    const res = await fetch(`${backend}/api/session/${channel}/report.json`);
+    const res = await fetch(`${backend}/api/session/${channel}/report.json`, {
+      headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+    });
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -150,7 +168,7 @@ function Landing() {
   };
   return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-8">
-      <h1 className="text-2xl font-bold">Sentiment Snapshot Panel</h1>
+      <h1 className="text-2xl font-bold">Mood Meter Panel</h1>
       <form onSubmit={goToChannel} className="flex flex-col items-center gap-2">
         <label className="font-semibold">Enter your Twitch channel name:</label>
         <input
