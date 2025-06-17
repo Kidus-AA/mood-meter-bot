@@ -16,7 +16,10 @@ const app = express();
 const server = http.createServer(app);
 const io = new SocketServer(server, { cors: { origin: '*' } });
 
-const redis = Redis.createClient({ url: CONFIG.redisUrl });
+const redis = Redis.createClient({
+  url: CONFIG.redisUrl,
+  socket: { tls: true, rejectUnauthorized: false },
+});
 await redis.connect();
 
 let twitchClient = null;
@@ -119,14 +122,14 @@ app.get('/api/auth/twitch/callback', async (req, res) => {
 // Add a dashboard route
 app.get('/dashboard', (req, res) => {
   res.send(`
-    <h2>Authentication successful!</h2>
-    <p>Your bot is now connected to Twitch chat.</p>
-    <ul>
-      <li><a href="http://localhost:5173/overlay">Open Overlay</a></li>
-      <li><a href="http://localhost:5173/panel">Open Panel</a></li>
-    </ul>
-    <p>Open your Twitch channel and send some chat messages to see sentiment analysis in action.</p>
-  `);
+      <h2>Authentication successful!</h2>
+      <p>Your bot is now connected to Twitch chat.</p>
+      <ul>
+        <li><a href="http://localhost:5173/overlay">Open Overlay</a></li>
+        <li><a href="http://localhost:5173/panel">Open Panel</a></li>
+      </ul>
+      <p>Open your Twitch channel and send some chat messages to see sentiment analysis in action.</p>
+    `);
 });
 
 // Support root redirect URI for OAuth callback
@@ -442,7 +445,10 @@ function checkAlerts(channel, score, now) {
     const settings = data
       ? JSON.parse(data)
       : { threshold: -0.5, duration: 30 };
-    let state = alertState.get(channel) || { belowSince: null, active: false };
+    let state = alertState.get(channel) || {
+      belowSince: null,
+      active: false,
+    };
     if (score < settings.threshold) {
       if (!state.belowSince) state.belowSince = now;
       if (!state.active && now - state.belowSince >= settings.duration * 1000) {
@@ -463,8 +469,8 @@ function checkAlerts(channel, score, now) {
   });
 }
 
-server.listen(CONFIG.port, async () => {
-  console.log(`[Backend] Listening on :${CONFIG.port}`);
+server.listen(process.env.PORT, async () => {
+  console.log(`[Backend] Listening on :${process.env.PORT}`);
   // Try to connect Twitch client if token is present
   await connectTwitchClient();
 });
