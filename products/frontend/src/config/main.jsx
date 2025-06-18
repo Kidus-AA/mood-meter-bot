@@ -1,35 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
+import '../styles/index.css';
 
-function Config() {
-  const [jwt, setJwt] = useState(null);
-  const [channelId, setChannelId] = useState(null);
-
-  useEffect(() => {
-    if (window.Twitch && window.Twitch.ext) {
-      window.Twitch.ext.onAuthorized((auth) => {
-        setJwt(auth.token);
-        setChannelId(auth.channelId);
-      });
-    }
-  }, []);
-
+function ConfigPage() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-8">
-      <h1 className="text-2xl font-bold mb-4">Mood Meter Configuration</h1>
-      {jwt ? (
-        <div>
-          <p className="mb-2">
-            Extension is authorized for channel: <b>{channelId}</b>
-          </p>
-          <p className="text-xs break-all">JWT: {jwt}</p>
-          {/* Add configuration UI here */}
-        </div>
-      ) : (
-        <p>Waiting for Twitch authorization...</p>
-      )}
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 gap-4">
+      <h1 className="text-xl font-bold">Sentiment Snapshot – Config</h1>
+      <p className="text-sm opacity-75 max-w-sm text-center">
+        No configuration options are required for this demo extension.
+      </p>
     </div>
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<Config />);
+ReactDOM.createRoot(document.getElementById('root')).render(<ConfigPage />);

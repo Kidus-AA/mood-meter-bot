@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const CONFIG = {
+  port: process.env.PORT || 4000,
   twitch: {
     username: process.env.TWITCH_BOT_USERNAME,
     channels: (process.env.TWITCH_CHANNELS || '').split(',').filter(Boolean),

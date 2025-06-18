@@ -1,0 +1,161 @@
+/* Global resets */
+* {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: transparent; /* let Twitch set panel bg */
+  color: #f1f1f1;
+}
+
+/* Simple Tailwind-ish utility subset we actually use */
+.w-full {
+  width: 100%;
+}
+.h-full {
+  height: 100%;
+}
+.flex {
+  display: flex;
+}
+.flex-col {
+  flex-direction: column;
+}
+.items-center {
+  align-items: center;
+}
+.justify-center {
+  justify-content: center;
+}
+.gap-2 {
+  gap: 0.5rem;
+}
+.mt-2 {
+  margin-top: 0.5rem;
+}
+.rounded {
+  border-radius: 0.25rem;
+}
+.rounded-lg {
+  border-radius: 0.5rem;
+}
+.border {
+  border: 1px solid #333;
+}
+.border-\[\#a970ff\] {
+  border-color: #a970ff;
+}
+.border-\[\#27272a\] {
+  border-color: #27272a;
+}
+.bg-\[\#18181bcc\] {
+  background-color: #18181bcc;
+}
+.bg-\[\#23232b\] {
+  background-color: #23232b;
+}
+.bg-\[\#a970ff\] {
+  background-color: #a970ff;
+}
+.hover\:bg-\[\#a970ff\]:hover {
+  background-color: #a970ff;
+}
+.hover\:text-white:hover {
+  color: #fff;
+}
+.text-white {
+  color: #fff;
+}
+.text-base {
+  font-size: 1rem;
+}
+.text-6xl {
+  font-size: 3.5rem;
+}
+.shadow {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+.shadow-lg {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+.select-none {
+  user-select: none;
+}
+.p-2 {
+  padding: 0.5rem;
+}
+.px-3 {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+.py-1 {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+.transition {
+  transition: all 0.15s ease;
+}
+.focus\:outline-none:focus {
+  outline: none;
+}
+.focus\:ring-2:focus {
+  box-shadow: 0 0 0 2px #a970ff;
+}
+.focus\:ring-\[\#a970ff\]:focus {
+  box-shadow: 0 0 0 2px #a970ff;
+}
+.focus\:ring-primary:focus {
+  box-shadow: 0 0 0 2px #a970ff;
+}
+
+/* Extra nicer look for Landing */
+.landing-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  gap: 1.5rem;
+}
+
+input[type='text'],
+button {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* custom color utilities */
+.bg-dark {
+  background-color: rgba(24, 24, 27, 0.8);
+}
+.bg-semidark {
+  background-color: #23232b;
+}
+.primary {
+  color: #a970ff;
+}
+.bg-primary {
+  background-color: #a970ff;
+}
+.border-purple {
+  border-color: #a970ff;
+}
+.border-dark {
+  border-color: #27272a;
+}

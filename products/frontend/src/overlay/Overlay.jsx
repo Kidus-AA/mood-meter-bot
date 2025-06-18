@@ -19,11 +19,15 @@ export default function Overlay({ channel }) {
   const sendVote = (vote) => socket?.emit('calibrate', { channel, vote });
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center text-6xl select-none">
-      <span>{EMOJI[current]}</span>
+    <div className="w-full h-full flex flex-col items-center justify-center bg-dark rounded-lg border border-purple shadow-lg text-6xl select-none p-2">
+      <span className="drop-shadow-lg">{EMOJI[current]}</span>
       <div className="mt-2 flex gap-2 text-base">
         {Object.keys(EMOJI).map((v) => (
-          <button key={v} onClick={() => sendVote(v)} className="px-2 py-1 rounded bg-gray-700/60 hover:bg-gray-600/60">
+          <button
+            key={v}
+            onClick={() => sendVote(v)}
+            className="px-3 py-1 rounded bg-semidark border text-white hover:bg-primary hover:text-white transition shadow focus:outline-none focus:ring-2 focus:ring-primary"
+          >
             {EMOJI[v]}
           </button>
         ))}
@@ -31,4 +35,3 @@ export default function Overlay({ channel }) {
     </div>
   );
 }
-

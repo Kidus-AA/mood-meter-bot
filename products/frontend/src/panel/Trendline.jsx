@@ -19,7 +19,7 @@ export default function Trendline({ channel }) {
 
   // Listen for live updates
   useEffect(() => {
-    const socket = connectSocket(channel);
+    const socket = connectSocket(channel, { panel: true });
     socket.on('sentiment:update', ({ score, ts }) => {
       setData((prev) => [...prev.slice(-179), { ts, score }]);
     });
@@ -49,37 +49,48 @@ export default function Trendline({ channel }) {
     const ts = label;
     if (activeTs !== ts) fetchMessages(ts);
     return (
-      <div className="bg-white text-black p-2 rounded shadow w-64">
-        <div className="font-bold mb-1">
+      <div className="bg-[#23232b] text-white p-2 rounded shadow-lg w-64 border border-[#a970ff]">
+        <div className="font-bold mb-1 text-[#a970ff]">
           {new Date(ts).toLocaleTimeString()} — Score:{' '}
-          {payload[0].value.toFixed(2)}
+          <span className="text-[#00c7ac]">{payload[0].value.toFixed(2)}</span>
         </div>
         {loading ? (
           <div>Loading messages...</div>
         ) : messages.length ? (
-          <ul className="text-xs list-disc pl-4">
+          <ul className="text-xs list-disc pl-4 max-h-24 overflow-y-auto">
             {messages.map((msg, i) => (
               <li key={i}>{msg}</li>
             ))}
           </ul>
         ) : (
-          <div className="text-xs">No sample messages</div>
+          <div className="text-xs text-gray-400">No sample messages</div>
         )}
       </div>
     );
   };
 
   return (
-    <LineChart
-      width={280}
-      height={260}
-      data={data}
-      margin={{ top: 10, right: 0, bottom: 0, left: 0 }}
+    <div
+      className="bg-[#23232b] rounded-lg shadow border border-[#27272a] p-2 flex flex-col items-center w-full"
+      style={{ maxWidth: 280 }}
     >
-      <XAxis dataKey="ts" hide tickFormatter={() => ''} />
-      <YAxis domain={[-1, 1]} hide />
-      <Tooltip content={<CustomTooltip />} />
-      <Line type="monotone" dataKey="score" strokeWidth={2} dot={false} />
-    </LineChart>
+      <LineChart
+        width={260}
+        height={200}
+        data={data}
+        margin={{ top: 10, right: 0, bottom: 0, left: 0 }}
+      >
+        <XAxis dataKey="ts" hide tickFormatter={() => ''} />
+        <YAxis domain={[-1, 1]} hide />
+        <Tooltip content={<CustomTooltip />} />
+        <Line
+          type="monotone"
+          dataKey="score"
+          strokeWidth={2}
+          dot={false}
+          stroke="#a970ff"
+        />
+      </LineChart>
+    </div>
   );
 }

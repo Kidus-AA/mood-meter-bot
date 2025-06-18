@@ -469,8 +469,7 @@ function checkAlerts(channel, score, now) {
   });
 }
 
-server.listen(process.env.PORT, async () => {
-  console.log(`[Backend] Listening on :${process.env.PORT}`);
-  // Try to connect Twitch client if token is present
+server.listen(CONFIG.PORT, async () => {
+  console.log(`[Backend] Listening on :${CONFIG.port}`);
   await connectTwitchClient();
 });
