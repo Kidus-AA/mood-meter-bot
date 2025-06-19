@@ -1,21 +1,22 @@
 import { useState, useEffect } from 'react';
 import Trendline from './Trendline.jsx';
+import EmojiGauge from './EmojiGauge.jsx';
 
 export default function PanelApp() {
   const [channelId, setChannelId] = useState(null);
 
   useEffect(() => {
-    if (
-      (window.Twitch && window.Twitch.ext) ||
-      import.meta.env.VITE_APP_ENV === 'local'
-    ) {
+    // 1) Manual override via URL param (?channel=loginOrId)
+    const urlParam = new URLSearchParams(window.location.search).get('channel');
+    if (urlParam) {
+      setChannelId(urlParam);
+      return; // skip Twitch auth handling
+    }
+
+    if (window.Twitch && window.Twitch.ext) {
       window.Twitch.ext.onAuthorized((auth) => {
         setChannelId(auth.channelId);
       });
-
-      if (import.meta.env.VITE_APP_ENV === 'local') {
-        setChannelId('1234567890');
-      }
     }
   }, []);
 
@@ -27,7 +28,9 @@ export default function PanelApp() {
           <p className="opacity-80 text-sm mb-2">
             Authorized for channel <b>{channelId}</b>
           </p>
-          <Trendline channel={channelId} />
+          <EmojiGauge channel={channelId} />
+
+          <Trendline channel={channelId} small />
 
           <div className="flex flex-col items-center gap-2 pt-4">
             <p className="text-sm opacity-70 italic">

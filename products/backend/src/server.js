@@ -18,7 +18,9 @@ const io = new SocketServer(server, { cors: { origin: '*' } });
 
 const redis = Redis.createClient({
   url: CONFIG.redisUrl,
-  socket: { tls: true, rejectUnauthorized: false },
+  ...(CONFIG.appEnv !== 'local' && {
+    socket: { tls: true, rejectUnauthorized: false },
+  }),
 });
 await redis.connect();
 
@@ -206,16 +208,27 @@ function setupTwitchHandlers() {
   twitchClient.on('message', (channel, tags, message, self) => {
     if (self) return;
     const key = channelKey(channel);
-    console.log('key', key, message);
-    const bucket = buffers.get(key) || [];
-    bucket.push(message);
-    buffers.set(key, bucket);
+    const idKey = tags['room-id'];
+
+    // Store by channel login (used by overlay)
+    const bucketLogin = buffers.get(key) || [];
+    bucketLogin.push(message);
+    buffers.set(key, bucketLogin);
+
+    // Also store by numeric channel ID (used by panel auth)
+    if (idKey) {
+      const bucketId = buffers.get(idKey) || [];
+      bucketId.push(message);
+      buffers.set(idKey, bucketId);
+    }
   });
 
   if (!sentimentInterval) {
     sentimentInterval = setInterval(async () => {
       const now = Date.now();
       for (const [key, msgs] of buffers) {
+        if (msgs.length === 0) continue; // keep previous sentiment if no new messages
+
         const score = scoreBatch(msgs);
         buffers.set(key, []);
 
@@ -469,7 +482,7 @@ function checkAlerts(channel, score, now) {
   });
 }
 
-server.listen(CONFIG.PORT, async () => {
-  console.log(`[Backend] Listening on :${CONFIG.port}`);
+server.listen(CONFIG.port, async () => {
+  console.log(`[Backend] Listening on port ${CONFIG.port}`);
   await connectTwitchClient();
 });

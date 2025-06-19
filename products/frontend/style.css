@@ -159,3 +159,17 @@ button:disabled {
 .border-dark {
   border-color: #27272a;
 }
+
+@keyframes emoji-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.emoji-float {
+  animation: emoji-float 2.5s ease-in-out infinite;
+}

@@ -2,7 +2,7 @@ import { LineChart, Line, XAxis, Tooltip, YAxis } from 'recharts';
 import { useEffect, useState, useCallback } from 'react';
 import { connectSocket } from '../common/socket';
 
-export default function Trendline({ channel }) {
+export default function Trendline({ channel, small = false }) {
   const [data, setData] = useState([]);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -76,7 +76,7 @@ export default function Trendline({ channel }) {
     >
       <LineChart
         width={260}
-        height={200}
+        height={small ? 140 : 200}
         data={data}
         margin={{ top: 10, right: 0, bottom: 0, left: 0 }}
       >

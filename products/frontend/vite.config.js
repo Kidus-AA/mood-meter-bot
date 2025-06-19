@@ -19,7 +19,8 @@ export default defineConfig({
   server: {
     open: 'public/panel.html',
     proxy: {
-      '/api': 'https://mood-meter-b5150035734c.herokuapp.com',
+      // '/api': 'https://mood-meter-b5150035734c.herokuapp.com',
+      '/api': 'http://localhost:4000',
     },
   },
 });
