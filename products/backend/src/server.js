@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
 
 import { CONFIG } from './config.js';
-import { scoreBatch, WINDOW_MS } from './sentimentEngine.js';
+import { scoreBatch, statsBatch, WINDOW_MS } from './sentimentEngine.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -229,7 +229,7 @@ function setupTwitchHandlers() {
       for (const [key, msgs] of buffers) {
         if (msgs.length === 0) continue; // keep previous sentiment if no new messages
 
-        const score = scoreBatch(msgs);
+        const { avg: score, pos, neu, neg } = statsBatch(msgs);
         buffers.set(key, []);
 
         const redisKey = `sentiment:${key}`;
@@ -249,7 +249,19 @@ function setupTwitchHandlers() {
           if (now - ts > MSG_HISTORY_WINDOW) buckets.delete(ts);
         }
 
-        io.to(key).emit('sentiment:update', { channel: key, score, ts: now });
+        const counts = { pos, neu, neg };
+        io.to(key).emit('sentiment:update', {
+          channel: key,
+          score,
+          counts,
+          ts: now,
+        });
+        io.to(`panel:${key}`).emit('sentiment:update', {
+          channel: key,
+          score,
+          counts,
+          ts: now,
+        });
         checkAlerts(key, score, now);
       }
     }, WINDOW_MS);

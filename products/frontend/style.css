@@ -166,10 +166,32 @@ button:disabled {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-10px);
+    transform: translateY(-6px);
   }
 }
 
 .emoji-float {
-  animation: emoji-float 2.5s ease-in-out infinite;
+  animation: emoji-float 4s ease-in-out infinite;
+}
+
+.tooltip {
+  position: absolute;
+  background-color: #4b5563; /* gray-700 */
+  color: #fff;
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+.tooltip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 100%;
+  border-width: 6px 6px 0 6px;
+  border-style: solid;
+  border-color: #4b5563 transparent transparent transparent;
 }

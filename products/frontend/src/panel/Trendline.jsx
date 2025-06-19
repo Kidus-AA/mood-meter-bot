@@ -1,4 +1,11 @@
-import { LineChart, Line, XAxis, Tooltip, YAxis } from 'recharts';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  Tooltip,
+  YAxis,
+  CartesianGrid,
+} from 'recharts';
 import { useEffect, useState, useCallback } from 'react';
 import { connectSocket } from '../common/socket';
 
@@ -8,13 +15,38 @@ export default function Trendline({ channel, small = false }) {
   const [loading, setLoading] = useState(false);
   const [activeTs, setActiveTs] = useState(null);
 
+  const POINT_MS = 10_000; // bucket size in backend
+  const BASE_POINTS = 180; // 30 min baseline
+
+  // Helper to generate neutral baseline
+  const neutralSeries = () => {
+    const now = Date.now();
+    return Array.from({ length: BASE_POINTS }, (_, i) => ({
+      ts: now - (BASE_POINTS - i) * POINT_MS,
+      score: 0,
+    }));
+  };
+
   // Fetch history on mount
   useEffect(() => {
     fetch(
       `${import.meta.env.VITE_BACKEND_URL}/api/sentiment/${channel}/history`
     )
       .then((r) => r.json())
-      .then((d) => setData(d));
+      .then((d) => {
+        if (d.length === 0) {
+          setData(neutralSeries());
+        } else {
+          // Prepend baseline up to earliest point so line has context
+          const firstTs = d[0].ts;
+          const now = Date.now();
+          const pointsBefore = [];
+          for (let ts = firstTs - POINT_MS * 10; ts < firstTs; ts += POINT_MS) {
+            pointsBefore.push({ ts, score: 0 });
+          }
+          setData([...pointsBefore, ...d]);
+        }
+      });
   }, [channel]);
 
   // Listen for live updates
@@ -45,9 +77,17 @@ export default function Trendline({ channel, small = false }) {
 
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }) => {
-    if (!active || !payload || !payload.length) return null;
     const ts = label;
-    if (activeTs !== ts) fetchMessages(ts);
+
+    // Fetch messages only when tooltip activates for new bucket
+    useEffect(() => {
+      if (active && payload && payload.length && activeTs !== ts) {
+        fetchMessages(ts);
+      }
+    }, [active, ts]);
+
+    if (!active || !payload || !payload.length) return null;
+
     return (
       <div className="bg-[#23232b] text-white p-2 rounded shadow-lg w-64 border border-[#a970ff]">
         <div className="font-bold mb-1 text-[#a970ff]">
@@ -80,8 +120,9 @@ export default function Trendline({ channel, small = false }) {
         data={data}
         margin={{ top: 10, right: 0, bottom: 0, left: 0 }}
       >
+        <CartesianGrid stroke="#444" strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="ts" hide tickFormatter={() => ''} />
-        <YAxis domain={[-1, 1]} hide />
+        <YAxis domain={[-1, 1]} ticks={[-1, -0.5, 0, 0.5, 1]} hide />
         <Tooltip content={<CustomTooltip />} />
         <Line
           type="monotone"

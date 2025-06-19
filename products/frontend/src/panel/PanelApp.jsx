@@ -22,14 +22,10 @@ export default function PanelApp() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 gap-6">
-      <h1 className="text-2xl font-bold">Sentiment Snapshot Panel</h1>
+      <h1 className="text-2xl font-bold">Mood Meter</h1>
       {channelId ? (
         <>
-          <p className="opacity-80 text-sm mb-2">
-            Authorized for channel <b>{channelId}</b>
-          </p>
           <EmojiGauge channel={channelId} />
-
           <Trendline channel={channelId} small />
 
           <div className="flex flex-col items-center gap-2 pt-4">
