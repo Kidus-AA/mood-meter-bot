@@ -122,16 +122,8 @@ app.get('/api/auth/twitch/callback', async (req, res) => {
 });
 
 // Add a dashboard route
-app.get('/dashboard', (req, res) => {
-  res.send(`
-      <h2>Authentication successful!</h2>
-      <p>Your bot is now connected to Twitch chat.</p>
-      <ul>
-        <li><a href="http://localhost:5173/overlay">Open Overlay</a></li>
-        <li><a href="http://localhost:5173/panel">Open Panel</a></li>
-      </ul>
-      <p>Open your Twitch channel and send some chat messages to see sentiment analysis in action.</p>
-    `);
+app.get('/dashboard', (_, res) => {
+  res.redirect(`http://localhost:5173/panel?channel=${channelKey(channel)}`);
 });
 
 // Support root redirect URI for OAuth callback

@@ -2,87 +2,111 @@ import React, { useMemo, useState } from 'react';
 
 export default function RainbowGauge({
   counts = { pos: 0, neu: 0, neg: 0 },
-  radius = 90,
-  thickness = 14,
-  faded = false,
+  score = 0, // -1 .. 1
+  width = 220,
+  height = 14,
 }) {
   const [hover, setHover] = useState(null); // {x, y, text}
 
-  const { paths } = useMemo(() => {
+  const segments = useMemo(() => {
     const { pos, neu, neg } = counts;
     const total = pos + neu + neg;
-    const clampTotal = total || 1;
-    const segs = [
-      { val: neg, color: '#ff6933', name: 'Negative' },
-      { val: neu, color: '#f5d328', name: 'Neutral' },
-      { val: pos, color: '#4caf50', name: 'Positive' },
+
+    const baseSegs = [
+      { key: 'neg', val: neg, color: '#ff4d4f', name: 'Negative' },
+      { key: 'neu', val: neu, color: '#facc15', name: 'Neutral' },
+      { key: 'pos', val: pos, color: '#22c55e', name: 'Positive' },
     ];
 
-    let startAngle = Math.PI; // 180° (left)
-    const pathEls = [];
+    if (total === 0) {
+      // equally sized segments when no data
+      return baseSegs.map((seg) => ({ ...seg, pct: 100 / 3 }));
+    }
 
-    for (const { val, color, name } of segs) {
-      const angleSpan = (val / clampTotal) * Math.PI;
-      const endAngle = startAngle - angleSpan;
+    return baseSegs.map((seg) => ({
+      ...seg,
+      pct: (seg.val / total) * 100,
+    }));
+  }, [counts]);
 
-      if (val > 0) {
-        const largeArc = angleSpan > Math.PI ? 1 : 0;
-        const sweep = 1;
+  const pointerX = useMemo(() => {
+    // map score -1..1 to 0..width
+    const clamped = Math.max(-1, Math.min(1, score));
+    return ((clamped + 1) / 2) * width;
+  }, [score, width]);
 
-        const sx = radius + radius * Math.cos(startAngle);
-        const sy = radius - radius * Math.sin(startAngle);
-        const ex = radius + radius * Math.cos(endAngle);
-        const ey = radius - radius * Math.sin(endAngle);
-
-        const d = [
-          `M ${sx} ${sy}`,
-          `A ${radius} ${radius} 0 ${largeArc} ${sweep} ${ex} ${ey}`,
-        ].join(' ');
-
-        pathEls.push(
-          <path
-            key={color}
-            d={d}
-            fill="none"
-            stroke={color}
-            strokeWidth={thickness}
-            strokeLinecap="round"
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      {/* gauge bar */}
+      <div
+        className="flex rounded-full overflow-hidden border border-gray-700"
+        style={{ width, height }}
+      >
+        {segments.map(({ key, pct, color, val, name }) => (
+          <div
+            key={key}
+            style={{
+              width: `${pct}%`,
+              backgroundColor: color,
+            }}
             onMouseEnter={(e) => {
+              // Calculate x relative to gauge container
               const rect = e.currentTarget.getBoundingClientRect();
+              const parentRect =
+                e.currentTarget.parentElement.getBoundingClientRect();
               setHover({
-                x: rect.left + rect.width / 2,
-                y: rect.top,
+                x: rect.left + rect.width / 2 - parentRect.left,
                 text: `${val} ${name}`,
               });
             }}
             onMouseLeave={() => setHover(null)}
           />
+        ))}
+      </div>
+      {/* pointer triangle (upward) */}
+      {(() => {
+        const pointerWidth = 18;
+        const pointerHeight = 10;
+        const margin = 8; // increased gap between gauge and triangle
+        return (
+          <svg
+            width={pointerWidth}
+            height={pointerHeight}
+            style={{
+              position: 'absolute',
+              left: pointerX - pointerWidth / 2,
+              top: height + margin, // place below gauge with margin
+              transition: 'left 0.4s ease',
+            }}
+          >
+            {/* Upward pointing triangle (apex at top) */}
+            <polygon
+              points={`0,${pointerHeight} ${pointerWidth},${pointerHeight} ${
+                pointerWidth / 2
+              },0`}
+              fill="#a970ff"
+            />
+          </svg>
         );
-      }
-
-      // advance for next segment regardless of drawing
-      startAngle = endAngle;
-    }
-
-    return { paths: pathEls };
-  }, [counts, radius, thickness]);
-
-  return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
-      <svg
-        width={radius * 2 + thickness}
-        height={radius + thickness}
-        viewBox={`${-thickness / 2} 0 ${radius * 2 + thickness} ${
-          radius + thickness
-        }`}
-        style={{ opacity: faded ? 0.6 : 1, overflow: 'visible' }}
-      >
-        {paths}
-      </svg>
+      })()}
+      {/* tooltip */}
       {hover && (
         <div
           className="tooltip"
-          style={{ left: hover.x, top: hover.y - 8, position: 'fixed' }}
+          style={{
+            position: 'absolute',
+            left: hover.x,
+            top: -30,
+            transform: 'translateX(-50%)',
+            background: '#505050',
+            color: 'white',
+            padding: '2px 6px',
+            borderRadius: 4,
+            fontSize: 12,
+            pointerEvents: 'none',
+            zIndex: 1000,
+            whiteSpace: 'nowrap',
+          }}
         >
           {hover.text}
         </div>
