@@ -1,0 +1,38 @@
+name: 'Get Twitch Extension Released Version'
+description: 'Fetch the version string of the extension currently live on Twitch CDN'
+inputs:
+  client-id:
+    description: 'Twitch Extension Client ID'
+    required: true
+  client-secret:
+    description: 'Twitch Extension Client Secret'
+    required: true
+runs:
+  using: 'composite'
+  outputs:
+    released-version: ${{ steps.fetch.outputs.released-version }}
+  steps:
+    - name: Get App Access Token
+      id: token
+      shell: bash
+      run: |
+        set -euo pipefail
+        TOKEN=$(curl -s -X POST \
+          -d "client_id=${{ inputs.client-id }}&client_secret=${{ inputs.client-secret }}&grant_type=client_credentials" \
+          https://id.twitch.tv/oauth2/token | jq -r .access_token)
+        echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+    - name: Fetch Released Version
+      id: fetch
+      shell: bash
+      env:
+        TOKEN: ${{ steps.token.outputs.token }}
+      run: |
+        set -euo pipefail
+        RESPONSE=$(curl -s \
+          -H "Client-ID: ${{ inputs.client-id }}" \
+          -H "Authorization: Bearer $TOKEN" \
+          "https://api.twitch.tv/helix/extensions/released?extension_id=${{ inputs.client-id }}")
+        VERSION=$(echo "$RESPONSE" | jq -r '.data[0].version')
+        echo "Released version: $VERSION"
+        echo "released-version=$VERSION" >> $GITHUB_OUTPUT
