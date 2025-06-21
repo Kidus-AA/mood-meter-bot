@@ -36,6 +36,11 @@ runs:
         echo "  password $HEROKU_API_KEY" >> ~/.netrc
         chmod 600 ~/.netrc
 
+    - name: Install Heroku CLI
+      shell: bash
+      run: |
+        curl -sSL https://cli-assets.heroku.com/install-ubuntu.sh | sudo bash
+
     - name: Log in to Heroku Container Registry
       shell: bash
       run: |

@@ -55,11 +55,25 @@ jobs:
           npm run build -w products/backend
           npm run build -w products/frontend
 
-      - name: Upload Frontend Artifact
+      - name: Bump Extension Version
+        id: version
+        working-directory: products/frontend
+        run: |
+          npm version patch --no-git-tag-version --silent
+          NEW_VER=$(node -p "require('./package.json').version")
+          echo "version=$NEW_VER" >> $GITHUB_OUTPUT
+
+      - name: Zip Frontend Build
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          cd products/frontend/dist
+          zip -r ../../extension-$VERSION.zip .
+
+      - name: Upload Frontend ZIP Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-build
-          path: products/frontend/dist/**
+          name: frontend-zip
+          path: products/extension-*.zip
           if-no-files-found: error
 
       - name: Log in to GitHub Container Registry
@@ -78,14 +92,6 @@ jobs:
           docker push "$IMAGE_NAME"
           echo "image=$IMAGE_NAME" >> $GITHUB_OUTPUT
 
-      - name: Bump Extension Version
-        id: version
-        working-directory: products/frontend
-        run: |
-          npm version patch --no-git-tag-version --silent
-          NEW_VER=$(node -p "require('./package.json').version")
-          echo "version=$NEW_VER" >> $GITHUB_OUTPUT
-
   deploy:
     name: Deploy - ${{ matrix.environment }}
     needs: prepare
@@ -97,23 +103,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Download Frontend Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-build
-          path: frontend-build
-
-      - name: Create ZIP of Extension Build
-        run: |
-          cd frontend-build
-          zip -r ../extension-${{ needs.prepare.outputs.version }}.zip .
-
-      - name: Upload ZIP artifact for manual CDN upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: twitch-extension-zip-${{ needs.prepare.outputs.version }}
-          path: extension-${{ needs.prepare.outputs.version }}.zip
 
       - name: Deploy Backend API
         uses: ./.github/actions/heroku/deploy
