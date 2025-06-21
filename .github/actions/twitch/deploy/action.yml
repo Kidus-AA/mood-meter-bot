@@ -23,7 +23,7 @@ runs:
         curl -sSL -o /tmp/twitch-cli.tar.gz \
           https://github.com/twitchdev/twitch-cli/releases/download/v1.1.24/twitch-cli_1.1.24_Linux_x86_64.tar.gz
         tar -xzf /tmp/twitch-cli.tar.gz -C /tmp
-        BIN=$(find /tmp -maxdepth 2 -type f -name 'twitch' -o -name 'twitch-cli' | head -n1)
+        BIN=$(sudo find /tmp -maxdepth 2 -type f -name 'twitch' -o -name 'twitch-cli' | head -n1)
         chmod +x "$BIN"
         echo "$(dirname "$BIN")" >> $GITHUB_PATH
 
