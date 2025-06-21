@@ -108,7 +108,7 @@ jobs:
         uses: ./.github/actions/heroku/deploy
         with:
           image: ${{ needs.prepare.outputs.backend-image }}
-          app-name: ${{ secrets.HEROKU_APP_NAME }}
+          app-name: ${{ vars.HEROKU_APP_NAME }}
           api-key: ${{ secrets.HEROKU_API_KEY }}
 
   release:
