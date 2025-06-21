@@ -82,7 +82,9 @@ jobs:
         id: version
         working-directory: products/frontend
         run: |
-          echo "version=$(npm version patch --no-git-tag-version | sed 's/^v//' | tr -d '\n')" >> $GITHUB_OUTPUT
+          npm version patch --no-git-tag-version --silent
+          NEW_VER=$(node -p "require('./package.json').version")
+          echo "version=$NEW_VER" >> $GITHUB_OUTPUT
 
   deploy:
     name: Deploy - ${{ matrix.environment }}

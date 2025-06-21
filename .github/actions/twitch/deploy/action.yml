@@ -22,11 +22,9 @@ runs:
         set -euo pipefail
         curl -sSL -o /tmp/twitch-cli.tar.gz \
           https://github.com/twitchdev/twitch-cli/releases/download/v1.1.24/twitch-cli_1.1.24_Linux_x86_64.tar.gz
-        tar -xzf /tmp/twitch-cli.tar.gz -C /tmp
-        # Find the extracted binary (could be named 'twitch' or 'twitch-cli')
-        CLI=$(find /tmp -maxdepth 1 -type f -perm -u+x -name 'twitch*' | head -n1)
-        chmod +x "$CLI"
-        echo "$(dirname "$CLI")" >> $GITHUB_PATH
+        tar -xzf /tmp/twitch-cli.tar.gz -C /tmp --strip-components=0
+        chmod +x /tmp/twitch* || true
+        echo "/tmp" >> $GITHUB_PATH
 
     - name: Zip Extension Build
       shell: bash
