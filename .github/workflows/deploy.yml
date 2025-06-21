@@ -72,7 +72,7 @@ jobs:
         id: backend-image
         run: |
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_NAME=ghcr.io/${OWNER}/vibe-check-backend:${{ github.sha }}
+          IMAGE_NAME=ghcr.io/${OWNER}/mood-meter-backend:${{ github.sha }}
           docker build -t "$IMAGE_NAME" -f products/backend/Dockerfile .
           docker push "$IMAGE_NAME"
           echo "image=$IMAGE_NAME" >> $GITHUB_OUTPUT
@@ -81,8 +81,7 @@ jobs:
         id: version
         working-directory: products/frontend
         run: |
-          BUMPED_VERSION=$(npm version patch --no-git-tag-version)
-          echo "version=${BUMPED_VERSION#v}" >> $GITHUB_OUTPUT
+          echo "version=$(npm version patch --no-git-tag-version | sed 's/^v//' | tr -d '\n')" >> $GITHUB_OUTPUT
 
   deploy:
     name: Deploy - ${{ matrix.environment }}
