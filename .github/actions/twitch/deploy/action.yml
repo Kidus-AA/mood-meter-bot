@@ -10,27 +10,36 @@ inputs:
   client-secret:
     description: 'Twitch Extension Secret'
     required: true
+  version:
+    description: 'Extension version string that already exists in the developer console (e.g. 0.0.1)'
+    required: true
 runs:
   using: 'composite'
   steps:
-    - name: Install Twitch CLI
+    - name: Install Twitch CLI (latest release)
       shell: bash
       run: |
-        npm install -g twitch-ext-cli
+        set -euo pipefail
+        curl -sSL https://github.com/twitchdev/twitch-cli/releases/download/v1.1.24/twitch-cli_1.1.24_Linux_x86_64.tar.gz | tar -xz -C /tmp
+        chmod +x /tmp/twitch-cli
+        echo "/tmp" >> $GITHUB_PATH
 
     - name: Zip Extension Build
       shell: bash
+      working-directory: ${{ inputs.build-path }}
       run: |
-        cd "${{ inputs.build-path }}"
         zip -r /tmp/extension.zip .
 
-    - name: Upload to Twitch CDN
+    - name: Upload to Twitch CDN via Twitch CLI
       shell: bash
       env:
         TWITCH_CLIENT_ID: ${{ inputs.client-id }}
         TWITCH_CLIENT_SECRET: ${{ inputs.client-secret }}
+        VERSION: ${{ inputs.version }}
       run: |
-        npx --yes twitch-ext-cli upload \
+        twitch configure --client-id "$TWITCH_CLIENT_ID" --client-secret "$TWITCH_CLIENT_SECRET"
+        twitch extensions upload-assets \
           --id "$TWITCH_CLIENT_ID" \
-          --secret "$TWITCH_CLIENT_SECRET" \
-          --file /tmp/extension.zip
+          --version "$VERSION" \
+          --file /tmp/extension.zip \
+          --yes

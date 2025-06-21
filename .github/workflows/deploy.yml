@@ -13,6 +13,7 @@ jobs:
       node-cache-hit: ${{ steps.dep-cache.outputs.cache-hit }}
       envs: ${{ steps.set-env.outputs.envs }}
       backend-image: ${{ steps.backend-image.outputs.image }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,17 +21,17 @@ jobs:
       - name: Determine deployment environments
         id: set-env
         run: |
-          envs='["DEV"]'
+          envs='["Dev"]'
           echo "envs=$envs" >> $GITHUB_OUTPUT
           exit 0
 
           # For future expansion
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            envs='["DEV"]'
+            envs='["Dev"]'
           elif [ "${{ github.event_name }}" = "push" ]; then
             envs='["QA"]'
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            envs='["PROD"]'
+            envs='["Prod"]'
           fi
 
       - name: Setup Node.js & Cache Dependencies
@@ -76,6 +77,13 @@ jobs:
           docker push "$IMAGE_NAME"
           echo "image=$IMAGE_NAME" >> $GITHUB_OUTPUT
 
+      - name: Bump Extension Version
+        id: version
+        working-directory: products/frontend
+        run: |
+          BUMPED_VERSION=$(npm version patch --no-git-tag-version)
+          echo "version=${BUMPED_VERSION#v}" >> $GITHUB_OUTPUT
+
   deploy:
     name: Deploy - ${{ matrix.environment }}
     needs: prepare
@@ -100,6 +108,7 @@ jobs:
           build-path: frontend-build
           client-id: ${{ secrets.TWITCH_CLIENT_ID }}
           client-secret: ${{ secrets.TWITCH_CLIENT_SECRET }}
+          version: ${{ needs.prepare.outputs.version }}
 
       - name: Deploy Backend API
         uses: ./.github/actions/heroku/deploy
@@ -107,3 +116,19 @@ jobs:
           image: ${{ needs.prepare.outputs.backend-image }}
           app-name: ${{ secrets.HEROKU_APP_NAME }}
           api-key: ${{ secrets.HEROKU_API_KEY }}
+
+  release:
+    name: Create Release
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.prepare.outputs.version }}
+          name: Release v${{ needs.prepare.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
