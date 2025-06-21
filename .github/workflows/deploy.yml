@@ -54,7 +54,7 @@ jobs:
       - name: Build
         run: |
           npm run build -w products/backend
-          VITE_BACKEND_URL=${{ vars.HEROKU_BACKEND_URL }} npm run build -w products/frontend
+          VITE_BACKEND_URL=${{ vars.HEROKU_API_URL }} npm run build -w products/frontend
 
       - name: Bump Extension Version
         id: version
