@@ -13,16 +13,19 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Zip extension build
+    - name: Zip Extension Build
       shell: bash
       run: |
         cd "${{ inputs.build-path }}"
         zip -r /tmp/extension.zip .
 
-    - name: Upload to Twitch CDN via twitch-ext-cli
+    - name: Upload to Twitch CDN
       shell: bash
+      env:
+        TWITCH_CLIENT_ID: ${{ inputs.client-id }}
+        TWITCH_CLIENT_SECRET: ${{ inputs.client-secret }}
       run: |
         npx --yes twitch-ext-cli upload \
-          --id "${{ inputs.client-id }}" \
-          --secret "${{ inputs.client-secret }}" \
+          --id "$TWITCH_CLIENT_ID" \
+          --secret "$TWITCH_CLIENT_SECRET" \
           --file /tmp/extension.zip

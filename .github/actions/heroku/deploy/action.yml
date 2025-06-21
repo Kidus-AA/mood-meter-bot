@@ -11,15 +11,18 @@ inputs:
     description: 'Directory that contains the app to deploy (defaults to repo root)'
     required: false
     default: '.'
+  image:
+    description: 'Image to deploy'
+    required: true
 runs:
   using: 'composite'
   steps:
-    - name: Set working directory
+    - name: Set Working Directory
       shell: bash
       run: |
         echo "Working directory: ${{ inputs.build-path }}"
 
-    - name: Configure Heroku credentials
+    - name: Configure Heroku Credentials
       shell: bash
       env:
         HEROKU_API_KEY: ${{ inputs.api-key }}
@@ -33,14 +36,23 @@ runs:
         echo "  password $HEROKU_API_KEY" >> ~/.netrc
         chmod 600 ~/.netrc
 
-    - name: Deploy to Heroku via git
+    - name: Log in to Heroku Container Registry
+      shell: bash
+      run: |
+        heroku container:login
+
+    - name: Pull Image & Push to Heroku Registry
       shell: bash
       env:
         HEROKU_APP_NAME: ${{ inputs.app-name }}
       run: |
-        cd "${{ inputs.build-path }}"
-        git init
-        git remote add heroku https://git.heroku.com/${HEROKU_APP_NAME}.git || true
-        git add .
-        git commit -m "Deploy from GitHub Action" || true
-        git push heroku HEAD:main --force
+        IMAGE="${{ inputs.image }}"
+        docker pull "$IMAGE"
+        docker tag "$IMAGE" registry.heroku.com/${HEROKU_APP_NAME}/web
+        docker push registry.heroku.com/${HEROKU_APP_NAME}/web
+
+    - name: Release Image
+      shell: bash
+      env:
+        HEROKU_APP_NAME: ${{ inputs.app-name }}
+      run: heroku container:release web --app $HEROKU_APP_NAME
