@@ -13,6 +13,11 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Install Twitch CLI
+      shell: bash
+      run: |
+        npm install -g twitch-ext-cli
+
     - name: Zip Extension Build
       shell: bash
       run: |
