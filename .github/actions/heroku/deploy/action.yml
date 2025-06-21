@@ -1,0 +1,46 @@
+name: 'Deploy to Heroku'
+description: 'Push a backend build or source to a Heroku app'
+inputs:
+  app-name:
+    description: 'Heroku app name'
+    required: true
+  api-key:
+    description: 'Heroku API key'
+    required: true
+  build-path:
+    description: 'Directory that contains the app to deploy (defaults to repo root)'
+    required: false
+    default: '.'
+runs:
+  using: 'composite'
+  steps:
+    - name: Set working directory
+      shell: bash
+      run: |
+        echo "Working directory: ${{ inputs.build-path }}"
+
+    - name: Configure Heroku credentials
+      shell: bash
+      env:
+        HEROKU_API_KEY: ${{ inputs.api-key }}
+        HEROKU_APP_NAME: ${{ inputs.app-name }}
+      run: |
+        echo "machine api.heroku.com" > ~/.netrc
+        echo "  login _" >> ~/.netrc
+        echo "  password $HEROKU_API_KEY" >> ~/.netrc
+        echo "machine git.heroku.com" >> ~/.netrc
+        echo "  login _" >> ~/.netrc
+        echo "  password $HEROKU_API_KEY" >> ~/.netrc
+        chmod 600 ~/.netrc
+
+    - name: Deploy to Heroku via git
+      shell: bash
+      env:
+        HEROKU_APP_NAME: ${{ inputs.app-name }}
+      run: |
+        cd "${{ inputs.build-path }}"
+        git init
+        git remote add heroku https://git.heroku.com/${HEROKU_APP_NAME}.git || true
+        git add .
+        git commit -m "Deploy from GitHub Action" || true
+        git push heroku HEAD:main --force

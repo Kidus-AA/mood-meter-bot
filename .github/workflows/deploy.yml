@@ -1,0 +1,102 @@
+name: Mood Meter CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      node-cache-hit: ${{ steps.dep-cache.outputs.cache-hit }}
+      envs: ${{ steps.set-env.outputs.envs }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine deployment environments
+        id: set-env
+        run: |
+          envs='["dev"]'
+
+          # For future expansion
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            envs='["dev"]'
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            envs='["qa"]'
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            envs='["prod"]'
+          fi
+
+          echo "envs=$envs" >> $GITHUB_OUTPUT
+
+      - name: Setup Node.js & Cache Dependencies
+        id: dep-cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint & Unit Tests
+        run: |
+          npm run lint --if-present
+          npm test --if-present
+
+      - name: Build
+        run: |
+          npm run build -w products/backend
+          npm run build -w products/frontend
+
+      - name: Upload Backend Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend-build
+          path: products/backend/dist/**
+
+      - name: Upload Frontend Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-build
+          path: products/frontend/dist/**
+
+  deploy:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: ${{ fromJson(needs.prepare.outputs.envs) }}
+    environment: ${{ matrix.environment }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Backend Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: backend-build
+          path: backend-build
+
+      - name: Download Frontend Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: frontend-build
+          path: frontend-build
+
+      - name: Deploy Twitch Extension
+        uses: ./.github/actions/twitch/deploy
+        with:
+          build-path: frontend-build
+          client-id: ${{ secrets.TWITCH_CLIENT_ID }}
+          client-secret: ${{ secrets.TWITCH_CLIENT_SECRET }}
+
+      - name: Deploy Backend API
+        uses: ./.github/actions/heroku/deploy
+        with:
+          build-path: products/backend
+          app-name: ${{ secrets.HEROKU_APP_NAME }}
+          api-key: ${{ secrets.HEROKU_API_KEY }}

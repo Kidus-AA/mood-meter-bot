@@ -1,0 +1,28 @@
+name: 'Deploy Twitch Extension'
+description: 'Upload a built Twitch Extension zip to Twitch CDN'
+inputs:
+  build-path:
+    description: 'Directory containing the built extension (will be zipped and uploaded)'
+    required: true
+  client-id:
+    description: 'Twitch Extension Client ID'
+    required: true
+  client-secret:
+    description: 'Twitch Extension Secret'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Zip extension build
+      shell: bash
+      run: |
+        cd "${{ inputs.build-path }}"
+        zip -r /tmp/extension.zip .
+
+    - name: Upload to Twitch CDN via twitch-ext-cli
+      shell: bash
+      run: |
+        npx --yes twitch-ext-cli upload \
+          --id "${{ inputs.client-id }}" \
+          --secret "${{ inputs.client-secret }}" \
+          --file /tmp/extension.zip
