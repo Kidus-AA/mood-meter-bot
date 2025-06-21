@@ -53,13 +53,13 @@ jobs:
           npm run build -w products/frontend
 
       - name: Upload Backend Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: backend-build
           path: products/backend/dist/**
 
       - name: Upload Frontend Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: frontend-build
           path: products/frontend/dist/**
@@ -76,13 +76,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download Backend Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: backend-build
           path: backend-build
 
       - name: Download Frontend Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: frontend-build
           path: frontend-build
