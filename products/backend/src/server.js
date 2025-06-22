@@ -121,9 +121,22 @@ app.get('/api/auth/twitch/callback', async (req, res) => {
   }
 });
 
-// Add a dashboard route
-app.get('/dashboard', (_, res) => {
-  res.redirect(`http://localhost:5173/panel?channel=${channelKey(channel)}`);
+// Add a dashboard route. Use the first configured channel by default, or allow
+// ?channel=<login> to override so users can inspect other channels locally.
+app.get('/dashboard', (req, res) => {
+  const chanParam = req.query.channel;
+  const fallback = CONFIG.twitch.channels[0];
+  const channel = chanParam || fallback;
+
+  if (!channel) {
+    return res
+      .status(400)
+      .send('No channel specified and TWITCH_CHANNELS is empty.');
+  }
+
+  res.redirect(
+    `http://localhost:5173/public/panel?channel=${channelKey(channel)}`
+  );
 });
 
 // Support root redirect URI for OAuth callback
