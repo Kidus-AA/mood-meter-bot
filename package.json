@@ -5,7 +5,7 @@
     "products/**"
   ],
   "scripts": {
-    "dev": "concurrently -k \"npm run dev -w products/backend\" \"npm run dev -w products/frontend\"",
+    "dev": "concurrently -k \"npm run dev -w products/backend\" \"npm run dev -w products/frontend\" \"docker run -d --name redis -p 6379:6379 redis:latest\"",
     "build": "npm run build -w products/backend && npm run build -w products/frontend",
     "start": "npm run start -w products/backend"
   },

@@ -3,16 +3,16 @@ const sentiment = new Sentiment();
 
 const WINDOW_MS = 10_000;
 
-export function scoreBatch(messages) {
+export const scoreBatch = (messages) => {
   if (messages.length === 0) return 0;
   const total = messages.reduce(
     (sum, msg) => sum + sentiment.analyze(msg).comparative,
     0
   );
-  return total / messages.length; // -1 ➜ +1
-}
+  return total / messages.length;
+};
 
-export function statsBatch(messages) {
+export const statsBatch = (messages) => {
   if (messages.length === 0) return { avg: 0, pos: 0, neu: 0, neg: 0 };
 
   let pos = 0,
@@ -29,6 +29,6 @@ export function statsBatch(messages) {
   }
 
   return { avg: total / messages.length, pos, neu, neg };
-}
+};
 
 export { WINDOW_MS };

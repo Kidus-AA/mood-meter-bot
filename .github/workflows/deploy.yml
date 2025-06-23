@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Run release pipeline'
+        required: false
+        default: 'false'
 
 jobs:
   prepare:
@@ -118,6 +123,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: approval
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release == 'true' }}
     steps:
       - name: Get released version from Twitch
         id: cdn
