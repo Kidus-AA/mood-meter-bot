@@ -8,6 +8,7 @@ import { oauthRouter } from './routes/twitchOauthRouter/index.js';
 import { channelKey } from './services/helpers/helpers.js';
 import { registerSocketHandlers } from './sockets/socketHandlers.js';
 import { connectTwitchClient } from './services/twitch/twitchClientService.js';
+import { trendRouter } from './routes/trendRouter/index.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -18,6 +19,7 @@ app.use(cors());
 
 app.use('/', sentimentRouter);
 app.use('/', oauthRouter);
+app.use('/', trendRouter);
 
 app.get('/dashboard', (req, res) => {
   const chanParam = req.query.channel;
