@@ -74,6 +74,8 @@ jobs:
       - name: Terraform Apply (Heroku App)
         id: tf_app
         working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
         run: |
           terraform apply -auto-approve -target=module.mood_meter.heroku_app.this
 
@@ -88,6 +90,8 @@ jobs:
       - name: Terraform Apply (Full Stack)
         id: tf_full
         working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
         run: terraform apply -auto-approve
 
       - name: Rollback
