@@ -123,7 +123,7 @@ jobs:
 
   release-app:
     name: Create Release
-    needs: [deploy-app]
+    needs: [prepare, deploy-app]
     runs-on: ubuntu-latest
     environment:
       name: approval

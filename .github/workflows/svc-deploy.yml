@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Determine deployment environments
         id: set-env
@@ -55,6 +57,10 @@ jobs:
 
           # PR diff against the merge base
           BASE="${{ github.event.before }}"
+          # Ensure the base commit exists locally; fetch it if the shallow clone missed it
+          if ! git cat-file -e "$BASE" 2>/dev/null; then
+            git fetch --depth=1 origin "$BASE"
+          fi
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             git fetch --depth=1 origin "${{ github.event.pull_request.base.ref }}"
             BASE="FETCH_HEAD"
