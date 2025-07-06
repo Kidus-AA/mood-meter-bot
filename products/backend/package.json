@@ -7,7 +7,8 @@
     "dev": "nodemon src/server.js",
     "build": "echo 'JS backend requires no build step'",
     "start": "node src/server.js",
-    "deploy": "docker build -t web . && heroku container:push web --app mood-meter && heroku container:release web --app mood-meter"
+    "deploy": "docker build -t web . && heroku container:push web --app mood-meter && heroku container:release web --app mood-meter",
+    "deploy-poc": "docker build -t web . && heroku container:push web --app mood-meter-poc && heroku container:release web --app mood-meter-poc"
   },
   "dependencies": {
     "axios": "^1.9.0",

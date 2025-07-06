@@ -1,12 +1,11 @@
-FROM node:18-alpine
+FROM node:24.3.0-alpine
 
 LABEL org.opencontainers.image.source=https://github.com/kidus-aa/mood-meter-bot
-LABEL org.opencontainers.image.description="Mood MeterTwitch Extension Backend"
+LABEL org.opencontainers.image.description="Mood Meter Twitch Extension Backend"
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install --production
 COPY . .
+RUN npm install --production
 
-ENTRYPOINT ["node", "src/server.js"]
+CMD ["node", "src/server.js"]

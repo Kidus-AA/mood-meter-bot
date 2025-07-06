@@ -98,7 +98,7 @@ jobs:
           docker push "$IMAGE_NAME"
           echo "image=$IMAGE_NAME" >> $GITHUB_OUTPUT
 
-  deploy:
+  deploy-app:
     name: Deploy - ${{ matrix.environment }}
     needs: prepare
     runs-on: ubuntu-latest
@@ -117,9 +117,9 @@ jobs:
           app-name: ${{ vars.HEROKU_APP_NAME }}
           api-key: ${{ secrets.HEROKU_API_KEY }}
 
-  release:
+  release-app:
     name: Create Release
-    needs: [deploy]
+    needs: [deploy-app]
     runs-on: ubuntu-latest
     environment:
       name: approval
