@@ -57,6 +57,7 @@ jobs:
 
           # PR diff against the merge base
           BASE="${{ github.event.before }}"
+
           # Ensure the base commit exists locally; fetch it if the shallow clone missed it
           if ! git cat-file -e "$BASE" 2>/dev/null; then
             git fetch --depth=1 origin "$BASE"
@@ -75,12 +76,12 @@ jobs:
 
           if [ -z "$WORKSPACE" ]; then
             echo "No service workspace detected ... skipping pipeline." >&2
-            exit 1
           fi
 
           echo "workspace=$WORKSPACE" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GitHub Container Registry
+        if: steps.setup-service.outputs.workspace != ''
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -103,6 +104,7 @@ jobs:
   deploy-svc:
     name: Deploy - ${{ matrix.environment }}
     needs: [prepare]
+    if: needs.prepare.outputs.service-workspace != ''
     runs-on: ubuntu-latest
     strategy:
       matrix:
