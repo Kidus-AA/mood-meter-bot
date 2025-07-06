@@ -102,13 +102,13 @@ jobs:
           if ! aws s3api head-bucket --bucket "${{ env.S3_BUCKET }}" >&2; then
             echo "S3 bucket '${{ env.S3_BUCKET }}' does not exist or is not accessible" >&2
             exit 0
+          else
+            BACKUP_KEY="${{ needs.prepare.outputs.app-name }}-backup-${GITHUB_RUN_ID}.tfstate"
+            STATE_KEY="${{ needs.prepare.outputs.app-name }}.tfstate"
+
+            aws s3 cp "s3://${{ env.S3_BUCKET }}/${STATE_KEY}" "s3://${{ env.S3_BUCKET }}/${BACKUP_KEY}"
+            echo "backup-key=$BACKUP_KEY" >> $GITHUB_OUTPUT
           fi
-
-          BACKUP_KEY="${{ needs.prepare.outputs.app-name }}-backup-${GITHUB_RUN_ID}.tfstate"
-          STATE_KEY="${{ needs.prepare.outputs.app-name }}.tfstate"
-
-          aws s3 cp "s3://${{ env.S3_BUCKET }}/${STATE_KEY}" "s3://${{ env.S3_BUCKET }}/${BACKUP_KEY}"
-          echo "backup-key=$BACKUP_KEY" >> $GITHUB_OUTPUT
 
       - name: Ensure Dynos Exist
         env:
