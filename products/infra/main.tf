@@ -1,7 +1,7 @@
 module "mood_meter" {
   source = "./modules/heroku_app"
 
-  app_name = var.app_name   # reuse existing variable
+  app_name = var.app_name # reuse existing variable
   region   = var.heroku_region
   stack    = var.stack
 
@@ -28,7 +28,7 @@ module "mood_meter" {
 resource "heroku_app_config_association" "env" {
   app_id = module.mood_meter.app_id
 
-  sensitive_vars  = var.sensitive_env_vars
+  sensitive_vars = var.sensitive_env_vars
 }
 
 output "app_name" {

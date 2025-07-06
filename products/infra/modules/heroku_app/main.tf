@@ -17,15 +17,19 @@ resource "heroku_formation" "dynos" {
   size     = each.value.size
 }
 
-resource "heroku_addon" "redis" {
-  count  = var.enable_redis ? 1 : 0
+resource "heroku_addon" "redis_cloud" {
   app_id = heroku_app.this.id
-  plan   = var.redis_plan
+  plan   = "rediscloud:30"
+}
+
+resource "heroku_addon" "cloudamqp" {
+  app_id = heroku_app.this.id
+  plan   = "cloudamqp:lemur"
 }
 
 locals {
   redis_env = var.enable_redis ? {
-    REDIS_URL      = one(heroku_addon.redis).config_var_values["REDIS_URL"]
+    REDIS_URL = one(heroku_addon.redis).config_var_values["REDIS_URL"]
   } : {}
 
   merged_vars = merge(local.redis_env, var.env_vars)
@@ -34,6 +38,6 @@ locals {
 resource "heroku_app_config_association" "env" {
   app_id = heroku_app.this.id
 
-  vars            = local.merged_vars
-  sensitive_vars  = var.sensitive_env_vars
+  vars           = local.merged_vars
+  sensitive_vars = var.sensitive_env_vars
 }
