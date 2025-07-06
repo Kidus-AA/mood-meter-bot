@@ -12,7 +12,7 @@ resource "heroku_formation" "dynos" {
   for_each = var.dynos
 
   app_id   = heroku_app.this.id
-  type     = each.key      # e.g., "web", "worker"
+  type     = each.key
   quantity = each.value.quantity
   size     = each.value.size
 }

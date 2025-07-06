@@ -10,7 +10,7 @@ module "mood_meter" {
       quantity = 1
       size     = var.backend_dyno_size
     }
-    worker = {
+    poller = {
       quantity = 1
       size     = var.poller_dyno_size
     }
