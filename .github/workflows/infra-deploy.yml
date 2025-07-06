@@ -44,6 +44,14 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Install Heroku CLI
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: |
+          curl -sSL https://cli-assets.heroku.com/install-ubuntu.sh | sudo bash
+          heroku authorizations:create --description "github-ci" || true
+          heroku auth:whoami
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -68,14 +76,6 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
           terraform apply -auto-approve -target=module.mood_meter.heroku_app.this
-
-      - name: Install Heroku CLI
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-        run: |
-          curl -sSL https://cli-assets.heroku.com/install-ubuntu.sh | sudo bash
-          heroku authorizations:create --description "github-ci" || true
-          heroku auth:whoami
 
       - name: Ensure Dynos Exist
         env:
