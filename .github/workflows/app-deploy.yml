@@ -2,6 +2,10 @@ name: Mood Meter CI/CD
 
 on:
   push:
+    paths:
+      - 'products/backend/**'
+      - 'products/frontend/**'
+      - '.github/workflows/app-deploy.yml'
     branches: [main]
   pull_request:
     branches: [main]
