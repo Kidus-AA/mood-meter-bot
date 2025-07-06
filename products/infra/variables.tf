@@ -18,13 +18,13 @@ variable "stack" {
 variable "backend_dyno_size" {
   description = "Dyno size for backend web process"
   type        = string
-  default     = "standard-1x"
+  default     = "basic"
 }
 
 variable "poller_dyno_size" {
   description = "Dyno size for poller worker process"
   type        = string
-  default     = "standard-1x"
+  default     = "basic"
 }
 
 variable "backend_redis_plan" {

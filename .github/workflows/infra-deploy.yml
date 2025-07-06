@@ -94,6 +94,20 @@ jobs:
         run: |
           terraform apply -auto-approve -target=module.mood_meter.heroku_app.this
 
+      #-------------------------------------------------------------------
+      # Save a copy of the *good* state (after the app exists but before the
+      # risky full-stack apply).  We can restore this file later if the full
+      # apply fails, instead of destroying the entire stack.
+      #-------------------------------------------------------------------
+      - name: Backup Terraform State
+        id: backup_state
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          set -euo pipefail
+          BACKUP_KEY="${{ needs.prepare.outputs.app-name }}-pre_full_apply-${GITHUB_RUN_ID}.tfstate"
+          aws s3 cp "s3://${{ env.S3_BUCKET }}/${{ needs.prepare.outputs.app-name }}.tfstate" "s3://${{ env.S3_BUCKET }}/${BACKUP_KEY}"
+          echo "backup_key=$BACKUP_KEY" >> $GITHUB_OUTPUT
+
       - name: Ensure Dynos Exist
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
@@ -109,9 +123,21 @@ jobs:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
         run: terraform apply -auto-approve
 
-      - name: Rollback
+      #-------------------------------------------------------------------
+      # Roll back only the Terraform *state* – restore the backup created
+      # earlier.  The infrastructure that already existed before this run
+      # remains untouched.
+      #-------------------------------------------------------------------
+      - name: Rollback State
         if: failure()
         working-directory: ${{ env.TF_WORKING_DIR }}
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-        run: terraform destroy -auto-approve
+        run: |
+          set -euo pipefail
+          if [[ -z "${{ steps.backup_state.outputs.backup_key }}" ]]; then
+            echo "No backup state key found – skipping rollback." >&2
+            exit 0
+          fi
+
+          echo "Restoring Terraform state from s3://${{ env.S3_BUCKET }}/${{ steps.backup_state.outputs.backup_key }}"
+          aws s3 cp "s3://${{ env.S3_BUCKET }}/${{ steps.backup_state.outputs.backup_key }}" "s3://${{ env.S3_BUCKET }}/${{ needs.prepare.outputs.app-name }}.tfstate"
+          echo "State restored.  The next pipeline run will reconcile any drift."
