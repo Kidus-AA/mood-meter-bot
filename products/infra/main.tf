@@ -16,8 +16,8 @@ module "mood_meter" {
     }
   }
 
-  enable_redis = true
-  redis_plan   = var.backend_redis_plan
+  redis_plan     = var.redis_plan
+  cloudamqp_plan = var.cloudamqp_plan
 
   env_vars = merge(var.env_vars, {
     APP_ENV = "production"

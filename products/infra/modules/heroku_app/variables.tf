@@ -23,16 +23,16 @@ variable "dynos" {
   }))
 }
 
-variable "enable_redis" {
-  description = "Whether to provision a Heroku Redis addon"
-  type        = bool
-  default     = true
-}
-
 variable "redis_plan" {
   description = "Heroku Redis plan"
   type        = string
-  default     = "heroku-redis:hobby-dev"
+  default     = "rediscloud:30"
+}
+
+variable "cloudamqp_plan" {
+  description = "Heroku CloudAMQP plan"
+  type        = string
+  default     = "cloudamqp:lemur"
 }
 
 variable "env_vars" {

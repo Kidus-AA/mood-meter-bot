@@ -94,7 +94,7 @@ jobs:
           terraform apply -auto-approve -target=module.mood_meter.heroku_app.this
 
       - name: Backup Terraform State
-        id: backup_state
+        id: backup-state
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
           set -euo pipefail
@@ -137,11 +137,11 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
           set -euo pipefail
-          if [[ -z "${{ steps.backup_state.outputs.backup_key }}" ]]; then
+          if [[ -z "${{ steps.backup-state.outputs.backup_key }}" ]]; then
             echo "No backup state key found – skipping rollback." >&2
             exit 0
           fi
 
-          echo "Restoring Terraform state from s3://${{ env.S3_BUCKET }}/${{ steps.backup_state.outputs.backup-key }}"
-          aws s3 cp "s3://${{ env.S3_BUCKET }}/${{ steps.backup_state.outputs.backup-key }}" "s3://${{ env.S3_BUCKET }}/${{ needs.prepare.outputs.app-name }}.tfstate"
+          echo "Restoring Terraform state from s3://${{ env.S3_BUCKET }}/${{ steps.backup-state.outputs.backup-key }}"
+          aws s3 cp "s3://${{ env.S3_BUCKET }}/${{ steps.backup-state.outputs.backup-key }}" "s3://${{ env.S3_BUCKET }}/${{ needs.prepare.outputs.app-name }}.tfstate"
           echo "State restored."

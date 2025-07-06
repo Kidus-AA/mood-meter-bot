@@ -19,18 +19,18 @@ resource "heroku_formation" "dynos" {
 
 resource "heroku_addon" "redis_cloud" {
   app_id = heroku_app.this.id
-  plan   = "rediscloud:30"
+  plan   = var.redis_plan
 }
 
 resource "heroku_addon" "cloudamqp" {
   app_id = heroku_app.this.id
-  plan   = "cloudamqp:lemur"
+  plan   = var.cloudamqp_plan
 }
 
 locals {
-  redis_env = var.enable_redis ? {
-    REDIS_URL = one(heroku_addon.redis_cloud).config_var_values["REDIS_URL"]
-  } : {}
+  redis_env = {
+    REDIS_URL = heroku_addon.redis_cloud.config_var_values["REDIS_URL"]
+  }
 
   merged_vars = merge(local.redis_env, var.env_vars)
 }
