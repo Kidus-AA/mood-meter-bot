@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Environment
 APP_NAME="${HEROKU_APP_NAME:-${APP_NAME:-}}"
-DYNOS="${DYNOS:-web,worker}"
+DYNOS="${DYNO_TYPES:-web,poller}"
 
 if [[ -z "$APP_NAME" ]]; then
   echo "APP_NAME or HEROKU_APP_NAME env var must be set" >&2
