@@ -4,7 +4,6 @@ on:
   push:
     paths:
       - 'products/infra/**'
-      - 'products/poller/**'
       - 'products/scripts/configure-dynos.sh'
       - '.github/workflows/infra-deploy.yml'
     branches: [main]

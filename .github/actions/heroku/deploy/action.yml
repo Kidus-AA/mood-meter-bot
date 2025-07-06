@@ -22,24 +22,13 @@ runs:
       run: |
         echo "Working directory: ${{ inputs.build-path }}"
 
-    - name: Configure Heroku Credentials
-      shell: bash
+    - name: Install Heroku CLI
       env:
         HEROKU_API_KEY: ${{ inputs.api-key }}
-        HEROKU_APP_NAME: ${{ inputs.app-name }}
-      run: |
-        echo "machine api.heroku.com" > ~/.netrc
-        echo "  login _" >> ~/.netrc
-        echo "  password $HEROKU_API_KEY" >> ~/.netrc
-        echo "machine git.heroku.com" >> ~/.netrc
-        echo "  login _" >> ~/.netrc
-        echo "  password $HEROKU_API_KEY" >> ~/.netrc
-        chmod 600 ~/.netrc
-
-    - name: Install Heroku CLI
-      shell: bash
       run: |
         curl -sSL https://cli-assets.heroku.com/install-ubuntu.sh | sudo bash
+        heroku authorizations:create --description "github-ci" || true
+        heroku auth:whoami
 
     - name: Log in to Heroku Container Registry
       shell: bash
@@ -59,5 +48,6 @@ runs:
     - name: Release Image
       shell: bash
       env:
+        HEROKU_API_KEY: ${{ inputs.api-key }}
         HEROKU_APP_NAME: ${{ inputs.app-name }}
       run: heroku container:release web --app $HEROKU_APP_NAME

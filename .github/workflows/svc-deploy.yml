@@ -1,0 +1,114 @@
+name: Mood Meter Service CI/CD
+
+on:
+  push:
+    paths:
+      - 'products/poller/**'
+      - '.github/workflows/svc-deploy.yml'
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      service-workspace:
+        description: 'Path to service workspace'
+        required: true
+        default: 'products/poller'
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      envs: ${{ steps.set-env.outputs.envs }}
+      service-image: ${{ steps.service-image.outputs.image }}
+      service-workspace: ${{ steps.setup-service.outputs.workspace }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine deployment environments
+        id: set-env
+        run: |
+          envs='["Dev"]'
+          echo "envs=$envs" >> $GITHUB_OUTPUT
+          exit 0
+
+          # For future expansion
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            envs='["Dev"]'
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            envs='["QA"]'
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            envs='["Prod"]'
+          fi
+
+      - name: Setup Service
+        id: setup-service
+        run: |
+          set -euo pipefail
+
+          if [ -n "${{ inputs.service-workspace || '' }}" ]; then
+            echo "workspace=${{ inputs.service-workspace }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # PR diff against the merge base
+          BASE="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --depth=1 origin "${{ github.event.pull_request.base.ref }}"
+            BASE="FETCH_HEAD"
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
+
+          WORKSPACE=""
+          if echo "$CHANGED" | grep -q '^products/poller/'; then
+            WORKSPACE='products/poller'
+          fi
+
+          if [ -z "$WORKSPACE" ]; then
+            echo "No service workspace detected ... skipping pipeline." >&2
+            exit 1
+          fi
+
+          echo "workspace=$WORKSPACE" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push Service Image
+        id: service-image
+        if: steps.setup-service.outputs.workspace != ''
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          SERVICE_WS="${{ steps.setup-service.outputs.workspace }}"
+          SERVICE_NAME=$(echo "${SERVICE_WS}" | tr '/' '-')
+          IMAGE_NAME=ghcr.io/${OWNER}/mood-meter-${SERVICE_NAME}:${{ github.sha }}
+
+          docker build -t "$IMAGE_NAME" "$SERVICE_WS"
+          docker push "$IMAGE_NAME"
+          echo "image=$IMAGE_NAME" >> $GITHUB_OUTPUT
+
+  deploy-svc:
+    name: Deploy - ${{ matrix.environment }}
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: ${{ fromJson(needs.prepare.outputs.envs) }}
+    environment: ${{ matrix.environment }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Deploy Service
+        uses: ./.github/actions/heroku/deploy
+        with:
+          image: ${{ needs.prepare.outputs.service-image }}
+          app-name: ${{ vars.HEROKU_APP_NAME }}
+          api-key: ${{ secrets.HEROKU_API_KEY }}
