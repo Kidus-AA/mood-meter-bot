@@ -8,7 +8,11 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      app_dynos:
+      app-name:
+        description: 'Heroku app name'
+        required: true
+        default: mood-meter-poc
+      app-dynos:
         description: 'Comma-separated list of dynos to deploy'
         required: false
         default: web,poller
@@ -21,7 +25,6 @@ env:
   TF_WORKING_DIR: products/infra
   AWS_REGION: us-east-1
   S3_BUCKET: mood-meter-storage
-  APP_NAME: mood-meter-poc
 
 jobs:
   deploy-infra:
@@ -57,7 +60,7 @@ jobs:
         run: |
           terraform init \
             -backend-config="bucket=${{ env.S3_BUCKET }}" \
-            -backend-config="key=${{ env.APP_NAME }}.tfstate" \
+            -backend-config="key=${{ inputs.app-name }}.tfstate" \
             -backend-config="region=${{ env.AWS_REGION }}"
 
       - name: Terraform Apply (Heroku App)
@@ -77,8 +80,8 @@ jobs:
       - name: Ensure Dynos Exist
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-          HEROKU_APP_NAME: ${{ env.APP_NAME }}
-          DYNO_TYPES: ${{ inputs.app_dynos }}
+          HEROKU_APP_NAME: ${{ inputs.app-name }}
+          DYNO_TYPES: ${{ inputs.app-dynos }}
         run: |
           npm run configure-dynos
 
@@ -88,6 +91,6 @@ jobs:
         run: terraform apply -auto-approve
 
       - name: Rollback
-        if: failure() && steps.tf_full.outcome == 'failure'
+        if: failure()
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform destroy -auto-approve
