@@ -11,7 +11,7 @@ output "app_url" {
 }
 
 output "redis_url" {
-  value       = try(one(heroku_addon.redis).config["REDIS_URL"], null)
+  value       = try(one(heroku_addon.redis_cloud).config["REDIS_URL"], null)
   description = "Redis connection url (null if redis disabled)"
   sensitive   = true
 }
