@@ -27,8 +27,21 @@ env:
   S3_BUCKET: mood-meter-storage
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      app-name: ${{ inputs.app-name || 'mood-meter-poc' }}
+      app-dynos: ${{ inputs.app-dynos || 'web,poller' }}
+    steps:
+      - name: Set Inputs
+        id: set-inputs
+        run: |
+          echo "app-name=${{ inputs.app-name || 'mood-meter-poc' }}" >> $GITHUB_OUTPUT
+          echo "app-dynos=${{ inputs.app-dynos || 'web,poller' }}" >> $GITHUB_OUTPUT
+
   deploy-infra:
     runs-on: ubuntu-latest
+    needs: [prepare]
 
     permissions:
       id-token: write
@@ -68,7 +81,7 @@ jobs:
         run: |
           terraform init \
             -backend-config="bucket=${{ env.S3_BUCKET }}" \
-            -backend-config="key=${{ inputs.app-name }}.tfstate" \
+            -backend-config="key=${{ needs.prepare.outputs.app-name }}.tfstate" \
             -backend-config="region=${{ env.AWS_REGION }}"
 
       - name: Terraform Apply (Heroku App)
@@ -82,8 +95,8 @@ jobs:
       - name: Ensure Dynos Exist
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-          HEROKU_APP_NAME: ${{ inputs.app-name }}
-          DYNO_TYPES: ${{ inputs.app-dynos }}
+          HEROKU_APP_NAME: ${{ needs.prepare.outputs.app-name }}
+          DYNO_TYPES: ${{ needs.prepare.outputs.app-dynos }}
         run: |
           npm run configure-dynos
 
@@ -97,4 +110,6 @@ jobs:
       - name: Rollback
         if: failure()
         working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
         run: terraform destroy -auto-approve

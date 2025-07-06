@@ -104,7 +104,7 @@ jobs:
 
   deploy-app:
     name: Deploy - ${{ matrix.environment }}
-    needs: prepare
+    needs: [prepare]
     runs-on: ubuntu-latest
     strategy:
       matrix:
