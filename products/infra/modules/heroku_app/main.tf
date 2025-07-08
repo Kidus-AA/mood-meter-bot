@@ -29,7 +29,7 @@ resource "heroku_addon" "cloudamqp" {
 
 locals {
   redis_env = {
-    REDIS_URL = heroku_addon.redis_cloud.config_var_values["REDIS_URL"]
+    REDIS_URL = heroku_addon.redis_cloud.config_var_values["REDISCLOUD_URL"]
   }
 
   merged_vars = merge(local.redis_env, var.env_vars)
