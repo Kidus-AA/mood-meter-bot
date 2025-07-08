@@ -40,12 +40,19 @@ jobs:
     outputs:
       app-name: ${{ inputs.app-name || 'mood-meter-poc' }}
       app-dynos: ${{ inputs.app-dynos || 'web,poller' }}
+      tf-action: ${{ steps.set-inputs.outputs.tf-action }}
     steps:
       - name: Set Inputs
         id: set-inputs
         run: |
           echo "app-name=${{ inputs.app-name || 'mood-meter-poc' }}" >> $GITHUB_OUTPUT
           echo "app-dynos=${{ inputs.app-dynos || 'web,poller' }}" >> $GITHUB_OUTPUT
+          ACTION="apply"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ACTION="${{ github.event.inputs['terraform-action'] }}"
+            if [ -z "$ACTION" ]; then ACTION="apply"; fi
+          fi
+          echo "tf-action=$ACTION" >> $GITHUB_OUTPUT
 
   setup-infra:
     runs-on: ubuntu-latest
@@ -93,7 +100,7 @@ jobs:
             -backend-config="region=${{ env.AWS_REGION }}"
 
       - name: Terraform Apply (Heroku App)
-        if: ${{ inputs.terraform-action == 'apply' }}
+        if: ${{ needs.prepare.outputs.tf-action == 'apply' }}
         id: tf-app
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
@@ -102,7 +109,7 @@ jobs:
           terraform apply -auto-approve -target=module.mood_meter.heroku_app.this
 
       - name: Backup Terraform State
-        if: ${{ inputs.terraform-action == 'apply' }}
+        if: ${{ needs.prepare.outputs.tf-action == 'apply' }}
         id: backup-state
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
@@ -127,7 +134,7 @@ jobs:
           echo "backup-key=$BACKUP_KEY" >> "$GITHUB_OUTPUT"
 
       - name: Ensure Dynos Exist
-        if: ${{ inputs.terraform-action == 'apply' }}
+        if: ${{ needs.prepare.outputs.tf-action == 'apply' }}
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
           HEROKU_APP_NAME: ${{ needs.prepare.outputs.app-name }}
@@ -136,7 +143,7 @@ jobs:
           npm run configure-dynos
 
       - name: Terraform Apply (Full Stack)
-        if: ${{ inputs.terraform-action == 'apply' }}
+        if: ${{ needs.prepare.outputs.tf-action == 'apply' }}
         id: tf_full
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
@@ -144,14 +151,14 @@ jobs:
         run: terraform apply -auto-approve
 
       - name: Terraform Destroy (Full Stack)
-        if: ${{ inputs.terraform-action == 'destroy' }}
+        if: ${{ needs.prepare.outputs.tf-action == 'destroy' }}
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
         run: terraform destroy -auto-approve
 
       - name: Rollback State
-        if: ${{ inputs.terraform-action == 'apply' && failure() }}
+        if: ${{ needs.prepare.outputs.tf-action == 'apply' && failure() }}
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
           set -euo pipefail
