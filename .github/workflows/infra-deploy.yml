@@ -17,6 +17,10 @@ on:
         description: 'Comma-separated list of dynos to deploy'
         required: false
         default: web,poller
+      terraform-action:
+        description: 'Terraform action to run'
+        required: false
+        default: 'apply'
 
 concurrency:
   group: ${{ github.workflow }}
@@ -40,7 +44,7 @@ jobs:
           echo "app-name=${{ inputs.app-name || 'mood-meter-poc' }}" >> $GITHUB_OUTPUT
           echo "app-dynos=${{ inputs.app-dynos || 'web,poller' }}" >> $GITHUB_OUTPUT
 
-  deploy-infra:
+  setup-infra:
     runs-on: ubuntu-latest
     needs: [prepare]
 
@@ -86,6 +90,7 @@ jobs:
             -backend-config="region=${{ env.AWS_REGION }}"
 
       - name: Terraform Apply (Heroku App)
+        if: ${{ inputs.terraform-action == 'apply' }}
         id: tf_app
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
