@@ -19,8 +19,11 @@ on:
         default: web,poller
       terraform-action:
         description: 'Terraform action to run'
-        required: false
-        default: 'apply'
+        type: choice
+        options:
+          - apply
+          - destroy
+        default: apply
 
 concurrency:
   group: ${{ github.workflow }}
@@ -91,7 +94,7 @@ jobs:
 
       - name: Terraform Apply (Heroku App)
         if: ${{ inputs.terraform-action == 'apply' }}
-        id: tf_app
+        id: tf-app
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
@@ -99,6 +102,7 @@ jobs:
           terraform apply -auto-approve -target=module.mood_meter.heroku_app.this
 
       - name: Backup Terraform State
+        if: ${{ inputs.terraform-action == 'apply' }}
         id: backup-state
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
@@ -123,6 +127,7 @@ jobs:
           echo "backup-key=$BACKUP_KEY" >> "$GITHUB_OUTPUT"
 
       - name: Ensure Dynos Exist
+        if: ${{ inputs.terraform-action == 'apply' }}
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
           HEROKU_APP_NAME: ${{ needs.prepare.outputs.app-name }}
@@ -131,14 +136,22 @@ jobs:
           npm run configure-dynos
 
       - name: Terraform Apply (Full Stack)
+        if: ${{ inputs.terraform-action == 'apply' }}
         id: tf_full
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
         run: terraform apply -auto-approve
 
+      - name: Terraform Destroy (Full Stack)
+        if: ${{ inputs.terraform-action == 'destroy' }}
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: terraform destroy -auto-approve
+
       - name: Rollback State
-        if: failure()
+        if: ${{ inputs.terraform-action == 'apply' && failure() }}
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
           set -euo pipefail
