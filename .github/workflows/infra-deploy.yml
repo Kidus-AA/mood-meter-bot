@@ -1,18 +1,12 @@
-name: Terraform Infra Deploy
+name: Terraform Infra
 
 on:
-  push:
-    paths:
-      - 'products/infra/**'
-      - 'products/scripts/configure-dynos.sh'
-      - '.github/workflows/infra-deploy.yml'
-    branches: [main]
   workflow_dispatch:
     inputs:
       app-name:
         description: 'Heroku app name'
         required: true
-        default: mood-meter-poc
+        default: mood-meter
       app-dynos:
         description: 'Comma-separated list of dynos to deploy'
         required: false
@@ -38,15 +32,15 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
-      app-name: ${{ inputs.app-name || 'mood-meter-poc' }}
-      app-dynos: ${{ inputs.app-dynos || 'web,poller' }}
+      app-name: ${{ inputs.app-name }}
+      app-dynos: ${{ inputs.app-dynos }}
       tf-action: ${{ steps.set-inputs.outputs.tf-action }}
     steps:
       - name: Set Inputs
         id: set-inputs
         run: |
-          echo "app-name=${{ inputs.app-name || 'mood-meter-poc' }}" >> $GITHUB_OUTPUT
-          echo "app-dynos=${{ inputs.app-dynos || 'web,poller' }}" >> $GITHUB_OUTPUT
+          echo "app-name=${{ inputs.app-name }}" >> $GITHUB_OUTPUT
+          echo "app-dynos=${{ inputs.app-dynos }}" >> $GITHUB_OUTPUT
           ACTION="apply"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             ACTION="${{ github.event.inputs['terraform-action'] }}"
@@ -54,7 +48,7 @@ jobs:
           fi
           echo "tf-action=$ACTION" >> $GITHUB_OUTPUT
 
-  setup-infra:
+  infra:
     runs-on: ubuntu-latest
     needs: [prepare]
 
